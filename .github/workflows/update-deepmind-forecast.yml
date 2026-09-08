@@ -1,0 +1,25 @@
+name: Update DeepMind forecast
+
+on:
+  schedule:
+    - cron: "15 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generate forecast JSON
+        run: python scripts/generate_deepmind_forecast.py --latitude 25.03 --longitude 121.56 --hours 48
+      - name: Commit updated forecast
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update DeepMind forecast JSON
+          file_pattern: public/deepmind_forecast.json
