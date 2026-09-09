@@ -1,0 +1,25 @@
+name: Check forecast model updates
+
+on:
+  schedule:
+    - cron: "35 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check official model sources
+        run: python scripts/check_model_updates.py --auto-adopt-compatible
+      - name: Commit compatible model updates
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update compatible forecast model registry
+          file_pattern: app/modelRegistry.ts public/model_update_report.json

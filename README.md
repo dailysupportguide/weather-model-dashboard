@@ -26,6 +26,18 @@ pnpm run dev
 - Google 模型更新時，修改 `GOOGLE_MODEL.dataUrl`，或在 Colab notebook 的 `run_deepmind_adapter()` 改接新版 WeatherNext / GraphCast
 - 前端對齊邏輯不需要重寫，仍會以啟用模型的共同時間戳交集作圖
 
+## 自動搜尋新版模型
+
+`scripts/check_model_updates.py` 會定期檢查官方來源並產生 `public/model_update_report.json`：
+
+- Open-Meteo ECMWF 模型：若找到同家族且 live API probe 通過的 model id，可自動更新 `app/modelRegistry.ts`
+- Google WeatherNext / GraphCast：偵測 GitHub 最新 release，但不自動切換，因為新版模型通常需要權重、資料權限和 adapter 驗證
+- GitHub Actions：`.github/workflows/check-model-updates.yml` 每週一執行一次
+
+```bash
+pnpm run check:models
+```
+
 ## 更新 DeepMind JSON
 
 ```bash

@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-09-09T01:23:41.065771Z",
+  "auto_adopt_compatible": true,
+  "registry_updated": true,
+  "open_meteo": {
+    "docs_url": "https://open-meteo.com/en/docs",
+    "discovered_ecmwf_models": [
+      "ecmwf_aifs025",
+      "ecmwf_aifs025_single",
+      "ecmwf_ifs",
+      "ecmwf_ifs025"
+    ],
+    "checks": [
+      {
+        "key": "ifs",
+        "label": "ECMWF IFS 物理",
+        "current_model_id": "ecmwf_ifs025",
+        "compatible_models": [
+          "ecmwf_ifs",
+          "ecmwf_ifs025"
+        ],
+        "selected_model_id": "ecmwf_ifs025",
+        "would_update": false,
+        "probe_results": [
+          {
+            "model_id": "ecmwf_ifs",
+            "ok": true,
+            "field_names": [
+              "temperature_2m"
+            ],
+            "timesteps": 24
+          },
+          {
+            "model_id": "ecmwf_ifs025",
+            "ok": true,
+            "field_names": [
+              "temperature_2m"
+            ],
+            "timesteps": 24
+          }
+        ]
+      },
+      {
+        "key": "aifs",
+        "label": "ECMWF AIFS 歐洲 AI",
+        "current_model_id": "ecmwf_aifs025",
+        "compatible_models": [
+          "ecmwf_aifs025",
+          "ecmwf_aifs025_single"
+        ],
+        "selected_model_id": "ecmwf_aifs025_single",
+        "would_update": true,
+        "probe_results": [
+          {
+            "model_id": "ecmwf_aifs025",
+            "ok": true,
+            "field_names": [
+              "temperature_2m"
+            ],
+            "timesteps": 24
+          },
+          {
+            "model_id": "ecmwf_aifs025_single",
+            "ok": true,
+            "field_names": [
+              "temperature_2m"
+            ],
+            "timesteps": 24
+          }
+        ]
+      }
+    ]
+  },
+  "google_weather": {
+    "docs_url": "https://developers.google.com/weathernext/guides/osmodel",
+    "github_repo": "google-deepmind/weathernext",
+    "auto_adopt": false,
+    "reason": "WeatherNext service models and open-source checkpoints need explicit data access, weights, and adapter validation before production use.",
+    "latest_open_source_release": {
+      "repo": "google-deepmind/weathernext",
+      "ok": true,
+      "tag_name": "v0.3.0",
+      "name": "Version 0.3.0",
+      "published_at": "2026-08-06T15:01:13Z",
+      "html_url": "https://github.com/google-deepmind/weathernext/releases/tag/v0.3.0"
+    },
+    "requires_manual_adapter_validation": true
+  }
+}

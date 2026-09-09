@@ -24,8 +24,8 @@ export const EUROPEAN_MODELS = [
     key: "aifs",
     label: "ECMWF AIFS 歐洲 AI",
     provider: "Open-Meteo",
-    modelId: "ecmwf_aifs025",
-    fieldCandidates: ["temperature_2m_ecmwf_aifs025", "temperature_2m"],
+    modelId: "ecmwf_aifs025_single",
+    fieldCandidates: ["temperature_2m_ecmwf_aifs025_single", "temperature_2m"],
     style: {
       borderColor: "#db2777",
       backgroundColor: "rgba(219, 39, 119, 0.12)",

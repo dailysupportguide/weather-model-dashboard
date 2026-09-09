@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
+    "check:models": "python scripts/check_model_updates.py --auto-adopt-compatible",
     "generate:deepmind": "python scripts/generate_deepmind_forecast.py",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },

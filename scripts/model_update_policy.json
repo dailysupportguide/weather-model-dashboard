@@ -1,0 +1,33 @@
+{
+  "open_meteo": {
+    "docs_url": "https://open-meteo.com/en/docs",
+    "probe": {
+      "latitude": 25.03,
+      "longitude": 121.56,
+      "forecast_days": 1,
+      "hourly": "temperature_2m"
+    },
+    "slots": [
+      {
+        "key": "ifs",
+        "label": "ECMWF IFS 物理",
+        "current_model_id": "ecmwf_ifs025",
+        "auto_adopt": true,
+        "allowed_model_pattern": "^ecmwf_ifs"
+      },
+      {
+        "key": "aifs",
+        "label": "ECMWF AIFS 歐洲 AI",
+        "current_model_id": "ecmwf_aifs025",
+        "auto_adopt": true,
+        "allowed_model_pattern": "^ecmwf_aifs"
+      }
+    ]
+  },
+  "google_weather": {
+    "docs_url": "https://developers.google.com/weathernext/guides/osmodel",
+    "github_repo": "google-deepmind/weathernext",
+    "auto_adopt": false,
+    "reason": "WeatherNext service models and open-source checkpoints need explicit data access, weights, and adapter validation before production use."
+  }
+}
