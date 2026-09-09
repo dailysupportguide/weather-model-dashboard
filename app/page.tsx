@@ -911,7 +911,7 @@ export default function Home() {
       <section className="chart-section" aria-label="Hourly temperature comparison">
         <div className="chart-heading">
           <div>
-            <h2>三模型逐時比較</h2>
+            <h2>逐時 2m 氣溫比較</h2>
             <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div className="legend-notes">

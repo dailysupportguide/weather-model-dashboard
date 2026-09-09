@@ -707,7 +707,7 @@
       <section class="chart-section" aria-label="Hourly temperature comparison">
         <div class="chart-heading">
           <div>
-            <h2>三模型逐時比較</h2>
+            <h2>逐時 2m 氣溫比較</h2>
             <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div class="legend-notes">
@@ -1321,6 +1321,7 @@
           showBanner(el.warning, result.warning);
           el.updatedAt.textContent = new Date().toLocaleString("zh-TW", { hour12: false });
           setStatus("ready", `${result.aligned.labels.length} 個共同時間步長已對齊`);
+          loadOfficialFramesSoon();
         } catch (error) {
           setStatus("error", "同步失敗");
           showBanner(el.error, error instanceof Error ? error.message : "資料同步時發生未知錯誤。");
@@ -1376,7 +1377,6 @@
               el.placeResults.replaceChildren();
               state.selectedPlace = place;
               renderOfficialForecast();
-              loadOfficialFramesSoon();
               synchronize(null, Number(place.latitude), Number(place.longitude));
             });
             el.placeResults.append(button);
@@ -1392,7 +1392,6 @@
       el.forecastForm.addEventListener("submit", synchronize);
       el.locationForm.addEventListener("submit", findLocation);
       renderOfficialForecast();
-      loadOfficialFramesSoon();
       synchronize();
     </script>
   </body>
