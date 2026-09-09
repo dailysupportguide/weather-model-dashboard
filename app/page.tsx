@@ -290,9 +290,20 @@ async function searchTaiwanTowns(query: string) {
 }
 
 function formatPlace(place: Place) {
-  return [place.name, place.county || place.admin2, place.admin1, place.country]
+  return uniquePlaceParts([place.name, place.county || place.admin2, place.admin1, place.country])
     .filter(Boolean)
     .join(" · ");
+}
+
+function uniquePlaceParts(parts: Array<string | undefined>) {
+  const seen = new Set<string>();
+  return parts.filter((part) => {
+    if (!part || seen.has(part)) {
+      return false;
+    }
+    seen.add(part);
+    return true;
+  });
 }
 
 function normalizeTaiwanText(value: string) {
@@ -506,12 +517,12 @@ export default function Home() {
                 >
                   <strong>{place.name}</strong>
                   <span>
-                    {[
+                    {uniquePlaceParts([
                       place.source === "taiwan-town" ? "鄉鎮市區" : "城市",
                       place.county || place.admin2,
                       place.admin1,
                       place.country,
-                    ]
+                    ])
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
