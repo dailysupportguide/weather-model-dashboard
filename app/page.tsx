@@ -797,7 +797,7 @@ export default function Home() {
           </label>
           <button type="submit" disabled={loadState === "loading" || !chartReady}>
             {loadState === "loading" ? <span className="spinner" aria-hidden="true" /> : null}
-            一鍵同步三方模型
+            手動同步座標
           </button>
         </form>
 
