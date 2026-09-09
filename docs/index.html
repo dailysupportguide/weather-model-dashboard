@@ -426,15 +426,16 @@
 
       .forecast-table {
         width: 100%;
-        min-width: 860px;
+        min-width: 2500px;
         border-collapse: collapse;
       }
 
       .forecast-table th,
       .forecast-table td {
         border-bottom: 1px solid #e2e8f0;
-        padding: 10px 9px;
-        text-align: right;
+        min-width: 48px;
+        padding: 10px 8px;
+        text-align: center;
         white-space: nowrap;
       }
 
@@ -453,9 +454,10 @@
         position: sticky;
         left: 0;
         z-index: 3;
-        min-width: 108px;
+        min-width: 128px;
         text-align: left;
         background: #ffffff;
+        box-shadow: 8px 0 14px rgba(15, 23, 42, 0.06);
       }
 
       .forecast-table th:first-child {
@@ -663,13 +665,19 @@
         }
 
         .forecast-table {
-          min-width: 780px;
+          min-width: 2450px;
         }
 
         .forecast-table th,
         .forecast-table td {
-          padding: 9px 8px;
+          min-width: 46px;
+          padding: 8px 7px;
           font-size: 0.82rem;
+        }
+
+        .forecast-table th:first-child,
+        .forecast-table td:first-child {
+          min-width: 112px;
         }
 
         .chart-frame canvas {
@@ -727,7 +735,7 @@
             <span>Longitude</span>
             <input id="longitudeInput" inputmode="decimal" value="121.56" />
           </label>
-          <button id="syncButton" type="submit">一鍵同步三方模型</button>
+          <button id="syncButton" type="submit">手動同步座標</button>
         </form>
 
         <div class="meta-grid">
@@ -792,19 +800,13 @@
           </div>
           <table class="forecast-table" aria-label="48-hour model comparison table">
             <thead>
-              <tr>
-                <th>時間</th>
-                <th>IFS 氣溫</th>
-                <th>IFS 降雨</th>
-                <th>AIFS 氣溫</th>
-                <th>AIFS 降雨</th>
-                <th>Google 氣溫</th>
-                <th>Google 降雨</th>
+              <tr id="forecastTableHead">
+                <th>模型項目</th>
               </tr>
             </thead>
             <tbody id="forecastTableBody">
               <tr>
-                <td colspan="7">正在載入預報資料</td>
+                <td>正在載入預報資料</td>
               </tr>
             </tbody>
           </table>
@@ -930,6 +932,7 @@
         warning: document.querySelector("#warning"),
         error: document.querySelector("#error"),
         chartLoading: document.querySelector("#chartLoading"),
+        forecastTableHead: document.querySelector("#forecastTableHead"),
         forecastTableBody: document.querySelector("#forecastTableBody"),
         tableNote: document.querySelector("#tableNote"),
         europeanModels: document.querySelector("#europeanModels"),
@@ -1311,21 +1314,29 @@
       }
 
       function renderTable(aligned) {
-        const rows = aligned.labels.slice(0, 48).map((time, index) => {
-          const googleTemp = aligned.google ? aligned.google[index] : null;
-          const googleRain = aligned.precipitation.google ? aligned.precipitation.google[index] : null;
-          return `
-            <tr>
-              <td>${formatTableTime(time)}</td>
-              <td class="metric-temp">${formatTemp(aligned.ifs[index])}</td>
-              <td class="metric-rain">${formatRain(aligned.precipitation.ifs[index])}</td>
-              <td class="metric-temp">${formatTemp(aligned.aifs[index])}</td>
-              <td class="metric-rain">${formatRain(aligned.precipitation.aifs[index])}</td>
-              <td class="metric-temp">${formatTemp(googleTemp)}</td>
-              <td class="metric-rain">${formatRain(googleRain)}</td>
-            </tr>
-          `;
-        });
+        const labels = aligned.labels.slice(0, 48);
+        el.forecastTableHead.innerHTML = `
+          <th>模型項目</th>
+          ${labels.map((time) => `<th>${formatTableTime(time)}</th>`).join("")}
+        `;
+
+        const rowConfigs = [
+          { label: "IFS 氣溫", values: aligned.ifs, formatter: formatTemp, className: "metric-temp" },
+          { label: "IFS 降雨", values: aligned.precipitation.ifs, formatter: formatRain, className: "metric-rain" },
+          { label: "AIFS 氣溫", values: aligned.aifs, formatter: formatTemp, className: "metric-temp" },
+          { label: "AIFS 降雨", values: aligned.precipitation.aifs, formatter: formatRain, className: "metric-rain" },
+          { label: "Google 氣溫", values: aligned.google || [], formatter: formatTemp, className: "metric-temp" },
+          { label: "Google 降雨", values: aligned.precipitation.google || [], formatter: formatRain, className: "metric-rain" },
+        ];
+
+        const rows = rowConfigs.map((row) => `
+          <tr>
+            <td>${row.label}</td>
+            ${labels
+              .map((_, index) => `<td class="${row.className}">${row.formatter(row.values[index] ?? null)}</td>`)
+              .join("")}
+          </tr>
+        `);
 
         el.forecastTableBody.innerHTML = rows.join("");
         el.tableNote.textContent = `${aligned.labels.length} 個共同時間步長已對齊。${aligned.precipitationLabels.ifs}；${aligned.precipitationLabels.aifs}；${aligned.precipitationLabels.google}。`;
