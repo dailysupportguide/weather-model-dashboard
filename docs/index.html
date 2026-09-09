@@ -424,9 +424,28 @@
         background: #ffffff;
       }
 
+      .table-area {
+        position: relative;
+      }
+
+      .table-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .forecast-table-card {
+        display: grid;
+        gap: 8px;
+      }
+
+      .forecast-table-card h3 {
+        margin: 0;
+        font-size: 0.98rem;
+      }
+
       .forecast-table {
         width: 100%;
-        min-width: 2500px;
+        min-width: 2400px;
         border-collapse: collapse;
       }
 
@@ -665,7 +684,7 @@
         }
 
         .forecast-table {
-          min-width: 2450px;
+          min-width: 2350px;
         }
 
         .forecast-table th,
@@ -786,41 +805,65 @@
         <div class="chart-heading">
           <div>
             <h2>未來 48 小時逐時表格</h2>
-            <p>從目前這個小時開始，逐時列出三模型的 2m 氣溫與降雨機率 / 風險。</p>
+            <p>只顯示目前時間之後，逐時列出三模型的 2m 氣溫與降雨機率 / 風險。</p>
           </div>
           <div class="legend-notes">
-            <span class="ifs">IFS</span>
-            <span class="aifs">AIFS</span>
-            <span class="deepmind">Google AI</span>
+            <span class="ifs">歐洲傳統</span>
+            <span class="aifs">歐洲AI</span>
+            <span class="deepmind">WNC</span>
           </div>
         </div>
-        <div class="forecast-table-wrap">
+        <div class="table-area">
           <div id="chartLoading" class="chart-loading" hidden>
             <span>正在抓取並對齊三方資料</span>
           </div>
-          <table class="forecast-table" aria-label="48-hour model comparison table">
-            <thead>
-              <tr id="forecastTableHead">
-                <th>模型項目</th>
-              </tr>
-            </thead>
-            <tbody id="forecastTableBody">
-              <tr>
-                <td>正在載入預報資料</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-stack">
+            <section class="forecast-table-card" aria-label="Hourly temperature table">
+              <h3>逐時氣溫</h3>
+              <div class="forecast-table-wrap">
+                <table class="forecast-table">
+                  <thead>
+                    <tr id="temperatureTableHead">
+                      <th>模型</th>
+                    </tr>
+                  </thead>
+                  <tbody id="temperatureTableBody">
+                    <tr>
+                      <td>正在載入預報資料</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section class="forecast-table-card" aria-label="Hourly rain probability table">
+              <h3>逐時降雨機率 / 風險</h3>
+              <div class="forecast-table-wrap">
+                <table class="forecast-table">
+                  <thead>
+                    <tr id="rainTableHead">
+                      <th>模型</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rainTableBody">
+                    <tr>
+                      <td>正在載入預報資料</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </div>
         <p id="tableNote" class="table-note">降雨欄位會優先使用模型提供的降雨機率；若模型未提供，改以逐時降雨量換算為降雨風險。</p>
       </section>
     </main>
 
     <script>
-      const forecastMode = { forecastHours: "48" };
+      const forecastMode = { forecastHours: "72", displayHours: 48 };
       const europeanModels = [
         {
           key: "ifs",
-          label: "ECMWF IFS 物理",
+          label: "歐洲傳統",
           modelId: "ecmwf_ifs025",
           fieldCandidates: ["temperature_2m_ecmwf_ifs025", "temperature_2m"],
           style: {
@@ -833,7 +876,7 @@
         },
         {
           key: "aifs",
-          label: "ECMWF AIFS 歐洲 AI",
+          label: "歐洲AI",
           modelId: "ecmwf_aifs025_single",
           fieldCandidates: ["temperature_2m_ecmwf_aifs025_single", "temperature_2m"],
           style: {
@@ -847,7 +890,7 @@
         },
       ];
       const googleModel = {
-        label: "Google WeatherNext 2",
+        label: "WNC",
         endpoint: "https://ensemble-api.open-meteo.com/v1/ensemble",
         modelId: "google_weathernext2_ensemble_mean",
         fallbackDataUrl: "deepmind_forecast.json",
@@ -932,8 +975,10 @@
         warning: document.querySelector("#warning"),
         error: document.querySelector("#error"),
         chartLoading: document.querySelector("#chartLoading"),
-        forecastTableHead: document.querySelector("#forecastTableHead"),
-        forecastTableBody: document.querySelector("#forecastTableBody"),
+        temperatureTableHead: document.querySelector("#temperatureTableHead"),
+        temperatureTableBody: document.querySelector("#temperatureTableBody"),
+        rainTableHead: document.querySelector("#rainTableHead"),
+        rainTableBody: document.querySelector("#rainTableBody"),
         tableNote: document.querySelector("#tableNote"),
         europeanModels: document.querySelector("#europeanModels"),
         officialTitle: document.querySelector("#officialTitle"),
@@ -993,7 +1038,14 @@
 
       function alignForecasts(seriesList) {
         const maps = seriesList.map(seriesToMap);
-        const commonTimes = seriesList[0].times.filter((time) => maps.every((map) => map.has(time)));
+        const now = Date.now();
+        const commonTimes = seriesList[0].times
+          .filter((time) => maps.every((map) => map.has(time)))
+          .filter((time) => {
+            const timestamp = new Date(time).getTime();
+            return Number.isFinite(timestamp) && timestamp > now;
+          })
+          .slice(0, forecastMode.displayHours);
         return {
           labels: commonTimes,
           values: seriesList.map((_, index) => commonTimes.map((time) => maps[index].get(time) ?? null)),
@@ -1269,7 +1321,7 @@
                 google: `${googleModel.label} 降雨機率`,
               },
             },
-            warning: "Google 模型資料時間軸未對齊，僅呈現歐洲雙核心",
+            warning: "WNC 資料時間軸未對齊，僅呈現歐洲雙核心",
           };
         }
 
@@ -1314,20 +1366,28 @@
       }
 
       function renderTable(aligned) {
-        const labels = aligned.labels.slice(0, 48);
-        el.forecastTableHead.innerHTML = `
-          <th>模型項目</th>
+        const labels = aligned.labels;
+        const temperatureRows = [
+          { label: "歐洲傳統", values: aligned.ifs, formatter: formatTemp, className: "metric-temp" },
+          { label: "歐洲AI", values: aligned.aifs, formatter: formatTemp, className: "metric-temp" },
+          { label: "WNC", values: aligned.google || [], formatter: formatTemp, className: "metric-temp" },
+        ];
+        const rainRows = [
+          { label: "歐洲傳統", values: aligned.precipitation.ifs, formatter: formatRain, className: "metric-rain" },
+          { label: "歐洲AI", values: aligned.precipitation.aifs, formatter: formatRain, className: "metric-rain" },
+          { label: "WNC", values: aligned.precipitation.google || [], formatter: formatRain, className: "metric-rain" },
+        ];
+
+        renderMetricTable(el.temperatureTableHead, el.temperatureTableBody, labels, temperatureRows);
+        renderMetricTable(el.rainTableHead, el.rainTableBody, labels, rainRows);
+        el.tableNote.textContent = `${labels.length} 個未來共同時間步長已對齊。${aligned.precipitationLabels.ifs}；${aligned.precipitationLabels.aifs}；${aligned.precipitationLabels.google}。`;
+      }
+
+      function renderMetricTable(headEl, bodyEl, labels, rowConfigs) {
+        headEl.innerHTML = `
+          <th>模型</th>
           ${labels.map((time) => `<th>${formatTableTime(time)}</th>`).join("")}
         `;
-
-        const rowConfigs = [
-          { label: "IFS 氣溫", values: aligned.ifs, formatter: formatTemp, className: "metric-temp" },
-          { label: "IFS 降雨", values: aligned.precipitation.ifs, formatter: formatRain, className: "metric-rain" },
-          { label: "AIFS 氣溫", values: aligned.aifs, formatter: formatTemp, className: "metric-temp" },
-          { label: "AIFS 降雨", values: aligned.precipitation.aifs, formatter: formatRain, className: "metric-rain" },
-          { label: "Google 氣溫", values: aligned.google || [], formatter: formatTemp, className: "metric-temp" },
-          { label: "Google 降雨", values: aligned.precipitation.google || [], formatter: formatRain, className: "metric-rain" },
-        ];
 
         const rows = rowConfigs.map((row) => `
           <tr>
@@ -1338,8 +1398,7 @@
           </tr>
         `);
 
-        el.forecastTableBody.innerHTML = rows.join("");
-        el.tableNote.textContent = `${aligned.labels.length} 個共同時間步長已對齊。${aligned.precipitationLabels.ifs}；${aligned.precipitationLabels.aifs}；${aligned.precipitationLabels.google}。`;
+        bodyEl.innerHTML = rows.join("");
       }
 
       async function synchronize(event, overrideLat, overrideLon) {
@@ -1361,7 +1420,7 @@
           renderTable(result.aligned);
           showBanner(el.warning, result.warning);
           el.updatedAt.textContent = new Date().toLocaleString("zh-TW", { hour12: false });
-          setStatus("ready", `${result.aligned.labels.length} 個共同時間步長已對齊`);
+          setStatus("ready", `${result.aligned.labels.length} 個未來共同時間步長已對齊`);
           loadOfficialFramesSoon();
         } catch (error) {
           setStatus("error", "同步失敗");
