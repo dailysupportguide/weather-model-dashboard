@@ -18,6 +18,16 @@ pnpm install
 pnpm run dev
 ```
 
+## GitHub Pages
+
+`docs/` 內含純靜態前端，可直接由 GitHub Pages 發布。推到 GitHub repo 後，在 repository settings 啟用 Pages，或使用 `.github/workflows/deploy-github-pages.yml` 透過 GitHub Actions 部署。
+
+主要檔案：
+
+- `docs/index.html`
+- `docs/deepmind_forecast.json`
+- `.github/workflows/deploy-github-pages.yml`
+
 ## 模型升級
 
 模型版本集中在 `app/modelRegistry.ts`：

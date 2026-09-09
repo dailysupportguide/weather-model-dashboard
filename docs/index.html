@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>全球三核心氣象模型預測對比儀表板</title>
+    <meta
+      name="description"
+      content="Compare aligned hourly 2m temperature forecasts from ECMWF IFS, ECMWF AIFS, and Google WeatherNext 2."
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 28rem),
+          linear-gradient(180deg, #f8fafc 0%, #eef6f3 100%);
+        color: #0f172a;
+        font-family: Arial, "Noto Sans TC", sans-serif;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .dashboard-shell {
+        width: min(1180px, calc(100% - 32px));
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 34px 0 42px;
+      }
+
+      .dashboard-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: start;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #0f766e;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 820px;
+        font-size: clamp(2rem, 5vw, 4.8rem);
+        line-height: 1.03;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 760px;
+        margin-top: 16px;
+        color: #475569;
+        font-size: 1.04rem;
+        line-height: 1.75;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-width: 180px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.84);
+        padding: 12px 16px;
+        color: #334155;
+        font-size: 0.92rem;
+        font-weight: 800;
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #94a3b8;
+      }
+
+      .status-pill.loading .status-dot {
+        background: #eab308;
+      }
+
+      .status-pill.ready .status-dot {
+        background: #16a34a;
+      }
+
+      .status-pill.error .status-dot {
+        background: #dc2626;
+      }
+
+      .control-band,
+      .chart-section {
+        border: 1px solid rgba(148, 163, 184, 0.45);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 18px;
+        box-shadow: 0 20px 54px rgba(15, 23, 42, 0.09);
+      }
+
+      .control-band {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr);
+        gap: 18px;
+      }
+
+      .location-controls {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(220px, 1fr) minmax(132px, auto);
+        gap: 14px;
+        align-items: end;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(180px, auto);
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+      }
+
+      label span,
+      .meta-grid span,
+      .model-registry span {
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+
+      input {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 12px;
+        color: #0f172a;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: #0284c7;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16);
+      }
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 44px;
+        align-self: end;
+        border: 0;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 10px 18px;
+        font-weight: 850;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+
+      .place-results {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .place-results button {
+        display: grid;
+        justify-content: start;
+        gap: 4px;
+        min-height: 70px;
+        border: 1px solid #dbe5ef;
+        background: #ffffff;
+        color: #0f172a;
+        padding: 10px 12px;
+        text-align: left;
+      }
+
+      .place-results strong {
+        overflow: hidden;
+        font-size: 0.92rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .place-results span {
+        color: #64748b;
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .meta-grid,
+      .model-registry {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .meta-grid div,
+      .model-registry div {
+        display: grid;
+        align-content: center;
+        gap: 6px;
+        min-height: 68px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 12px;
+      }
+
+      .meta-grid strong,
+      .model-registry strong {
+        color: #0f172a;
+        font-size: 0.93rem;
+        line-height: 1.45;
+      }
+
+      .warning-banner,
+      .error-banner,
+      .model-registry,
+      .chart-section {
+        margin-top: 18px;
+      }
+
+      .warning-banner,
+      .error-banner {
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-weight: 800;
+      }
+
+      .warning-banner {
+        border: 1px solid #facc15;
+        background: #fef9c3;
+        color: #854d0e;
+      }
+
+      .error-banner {
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+      }
+
+      .chart-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+
+      .chart-heading h2 {
+        font-size: 1.12rem;
+      }
+
+      .chart-heading p {
+        margin-top: 6px;
+        color: #64748b;
+        line-height: 1.6;
+      }
+
+      .legend-notes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .legend-notes span {
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: #ffffff;
+        font-size: 0.78rem;
+        font-weight: 850;
+      }
+
+      .ifs {
+        background: #0284c7;
+      }
+
+      .aifs {
+        background: #db2777;
+      }
+
+      .deepmind {
+        background: #16a34a;
+      }
+
+      .chart-frame {
+        position: relative;
+        height: min(58vh, 560px);
+        min-height: 380px;
+      }
+
+      .chart-frame canvas {
+        width: 100%;
+        height: 100%;
+      }
+
+      .chart-loading {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        place-content: center;
+        gap: 12px;
+        justify-items: center;
+        border-radius: 8px;
+        background: rgba(248, 250, 252, 0.82);
+        color: #334155;
+        font-weight: 850;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .dashboard-header,
+        .control-band,
+        .location-controls,
+        .controls,
+        .meta-grid,
+        .model-registry {
+          grid-template-columns: 1fr;
+        }
+
+        .status-pill {
+          width: fit-content;
+        }
+
+        .place-results {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .dashboard-shell {
+          width: min(100% - 20px, 1180px);
+          padding-top: 22px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        .lead {
+          font-size: 0.96rem;
+        }
+
+        .chart-heading {
+          display: grid;
+        }
+
+        .legend-notes {
+          justify-content: flex-start;
+        }
+
+        .chart-frame {
+          min-height: 330px;
+        }
+
+        .place-results {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <section class="dashboard-header">
+        <div>
+          <p class="eyebrow">Global Model Comparison</p>
+          <h1>全球三核心氣象模型預測對比儀表板</h1>
+          <p class="lead">
+            以未來 48 小時逐時氣溫作為三方模型交集窗口，將 ECMWF IFS、
+            ECMWF AIFS 與 Google WeatherNext 2 對齊到同一條時間軸。
+          </p>
+        </div>
+        <div id="statusPill" class="status-pill">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="statusText">待同步</span>
+        </div>
+      </section>
+
+      <section class="control-band" aria-label="Forecast controls">
+        <form id="locationForm" class="location-controls">
+          <label>
+            <span>地點</span>
+            <input id="locationInput" value="台北市" placeholder="輸入城市、地標或行政區" />
+          </label>
+          <button id="locationButton" type="submit">搜尋地點</button>
+          <div id="placeResults" class="place-results" aria-label="Location search results"></div>
+        </form>
+
+        <form id="forecastForm" class="controls">
+          <label>
+            <span>Latitude</span>
+            <input id="latitudeInput" inputmode="decimal" value="25.03" />
+          </label>
+          <label>
+            <span>Longitude</span>
+            <input id="longitudeInput" inputmode="decimal" value="121.56" />
+          </label>
+          <button id="syncButton" type="submit">一鍵同步三方模型</button>
+        </form>
+
+        <div class="meta-grid">
+          <div>
+            <span>模式</span>
+            <strong>標準 48 小時</strong>
+          </div>
+          <div>
+            <span>資料對齊</span>
+            <strong>時間戳交集 AND</strong>
+          </div>
+          <div>
+            <span>更新時間</span>
+            <strong id="updatedAt">尚未同步</strong>
+          </div>
+        </div>
+      </section>
+
+      <div id="warning" class="warning-banner" hidden></div>
+      <div id="error" class="error-banner" hidden></div>
+
+      <section class="model-registry" aria-label="Model registry">
+        <div>
+          <span>歐洲模型</span>
+          <strong id="europeanModels"></strong>
+        </div>
+        <div>
+          <span>Google 模型來源</span>
+          <strong>Open-Meteo Google WeatherNext 2 API</strong>
+        </div>
+        <div>
+          <span>升級策略</span>
+          <strong>三個槽位每週檢查；通過 live API probe 才自動採用。</strong>
+        </div>
+      </section>
+
+      <section class="chart-section" aria-label="Hourly temperature comparison">
+        <div class="chart-heading">
+          <div>
+            <h2>逐時 2m 氣溫曲線</h2>
+            <p>三條曲線只顯示共同存在的時間點，避免模型預報長度不同造成誤判。</p>
+          </div>
+          <div class="legend-notes">
+            <span class="ifs">IFS</span>
+            <span class="aifs">AIFS</span>
+            <span class="deepmind">Google AI</span>
+          </div>
+        </div>
+        <div class="chart-frame">
+          <div id="chartLoading" class="chart-loading" hidden>
+            <span>正在抓取並對齊三方資料</span>
+          </div>
+          <canvas id="forecastChart" aria-label="Hourly temperature line chart"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const forecastMode = { forecastDays: "2" };
+      const europeanModels = [
+        {
+          key: "ifs",
+          label: "ECMWF IFS 物理",
+          modelId: "ecmwf_ifs025",
+          fieldCandidates: ["temperature_2m_ecmwf_ifs025", "temperature_2m"],
+          style: {
+            borderColor: "#0284c7",
+            backgroundColor: "rgba(2, 132, 199, 0.12)",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.32,
+          },
+        },
+        {
+          key: "aifs",
+          label: "ECMWF AIFS 歐洲 AI",
+          modelId: "ecmwf_aifs025_single",
+          fieldCandidates: ["temperature_2m_ecmwf_aifs025_single", "temperature_2m"],
+          style: {
+            borderColor: "#db2777",
+            backgroundColor: "rgba(219, 39, 119, 0.12)",
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.32,
+          },
+        },
+      ];
+      const googleModel = {
+        label: "Google WeatherNext 2",
+        endpoint: "https://ensemble-api.open-meteo.com/v1/ensemble",
+        modelId: "google_weathernext2_ensemble_mean",
+        fallbackDataUrl: "deepmind_forecast.json",
+        fieldCandidates: ["temperature_2m"],
+        style: {
+          borderColor: "#16a34a",
+          backgroundColor: "rgba(22, 163, 74, 0.14)",
+          borderWidth: 3,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          tension: 0.32,
+        },
+      };
+
+      const state = { chart: null };
+      const el = {
+        statusPill: document.querySelector("#statusPill"),
+        statusText: document.querySelector("#statusText"),
+        locationForm: document.querySelector("#locationForm"),
+        locationInput: document.querySelector("#locationInput"),
+        locationButton: document.querySelector("#locationButton"),
+        placeResults: document.querySelector("#placeResults"),
+        forecastForm: document.querySelector("#forecastForm"),
+        latitudeInput: document.querySelector("#latitudeInput"),
+        longitudeInput: document.querySelector("#longitudeInput"),
+        syncButton: document.querySelector("#syncButton"),
+        updatedAt: document.querySelector("#updatedAt"),
+        warning: document.querySelector("#warning"),
+        error: document.querySelector("#error"),
+        chartLoading: document.querySelector("#chartLoading"),
+        europeanModels: document.querySelector("#europeanModels"),
+        canvas: document.querySelector("#forecastChart"),
+      };
+
+      el.europeanModels.textContent = europeanModels.map((model) => model.modelId).join(" / ");
+
+      function setStatus(kind, text) {
+        el.statusPill.className = `status-pill ${kind}`;
+        el.statusText.textContent = text;
+        el.chartLoading.hidden = kind !== "loading";
+      }
+
+      function showBanner(node, message) {
+        node.textContent = message;
+        node.hidden = !message;
+      }
+
+      function pickSeries(data, fieldCandidates) {
+        const hourly = data.hourly || {};
+        const time = Array.isArray(hourly.time) ? hourly.time : [];
+        const field = fieldCandidates.find((name) => Array.isArray(hourly[name]));
+        return { time, values: field ? hourly[field] : [] };
+      }
+
+      function seriesToMap(series) {
+        const map = new Map();
+        series.times.forEach((time, index) => map.set(time, series.values[index] ?? null));
+        return map;
+      }
+
+      function alignForecasts(seriesList) {
+        const maps = seriesList.map(seriesToMap);
+        const commonTimes = seriesList[0].times.filter((time) => maps.every((map) => map.has(time)));
+        return {
+          labels: commonTimes,
+          values: seriesList.map((_, index) => commonTimes.map((time) => maps[index].get(time) ?? null)),
+        };
+      }
+
+      function formatHourLabel(value) {
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return new Intl.DateTimeFormat("zh-TW", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(parsed);
+      }
+
+      async function fetchJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`${url} failed: ${response.status}`);
+        return response.json();
+      }
+
+      async function fetchForecasts(latitude, longitude) {
+        const europeanParams = new URLSearchParams({
+          latitude,
+          longitude,
+          hourly: "temperature_2m",
+          models: europeanModels.map((model) => model.modelId).join(","),
+          forecast_days: forecastMode.forecastDays,
+          timezone: "auto",
+        });
+        const googleParams = new URLSearchParams({
+          latitude,
+          longitude,
+          hourly: "temperature_2m",
+          models: googleModel.modelId,
+          forecast_days: forecastMode.forecastDays,
+          timezone: "auto",
+        });
+
+        const [europeanData, googleData] = await Promise.all([
+          fetchJson(`https://api.open-meteo.com/v1/forecast?${europeanParams.toString()}`),
+          fetchJson(`${googleModel.endpoint}?${googleParams.toString()}`).catch(() =>
+            fetchJson(`${googleModel.fallbackDataUrl}?ts=${Date.now()}`),
+          ),
+        ]);
+
+        const europeanSeries = europeanModels.map((model) => {
+          const forecast = pickSeries(europeanData, model.fieldCandidates);
+          return {
+            label: model.label,
+            source: model.key,
+            times: forecast.time,
+            values: forecast.values,
+          };
+        });
+        const googleForecast = pickSeries(googleData, googleModel.fieldCandidates);
+        const allSeries = [
+          ...europeanSeries,
+          {
+            label: googleModel.label,
+            source: "google",
+            times: googleForecast.time,
+            values: googleForecast.values,
+          },
+        ];
+        const aligned = alignForecasts(allSeries);
+
+        if (!aligned.labels.length) {
+          const europeanOnly = alignForecasts(europeanSeries);
+          return {
+            aligned: {
+              labels: europeanOnly.labels,
+              ifs: europeanOnly.values[0],
+              aifs: europeanOnly.values[1],
+            },
+            warning: "Google 模型資料時間軸未對齊，僅呈現歐洲雙核心",
+          };
+        }
+
+        return {
+          aligned: {
+            labels: aligned.labels,
+            ifs: aligned.values[0],
+            aifs: aligned.values[1],
+            google: aligned.values[2],
+          },
+          warning: "",
+        };
+      }
+
+      function renderChart(aligned) {
+        if (state.chart) state.chart.destroy();
+        const datasets = [
+          { label: europeanModels[0].label, data: aligned.ifs, ...europeanModels[0].style },
+          { label: europeanModels[1].label, data: aligned.aifs, ...europeanModels[1].style },
+        ];
+        if (aligned.google) {
+          datasets.push({ label: googleModel.label, data: aligned.google, ...googleModel.style });
+        }
+
+        state.chart = new Chart(el.canvas, {
+          type: "line",
+          data: { labels: aligned.labels.map(formatHourLabel), datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: "index" },
+            plugins: {
+              legend: { position: "top", labels: { boxWidth: 24, boxHeight: 3, color: "#334155" } },
+              tooltip: {
+                callbacks: {
+                  label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(1)} °C`,
+                },
+              },
+            },
+            scales: {
+              x: {
+                ticks: { color: "#64748b", maxRotation: 0, autoSkipPadding: 28 },
+                grid: { color: "rgba(148, 163, 184, 0.18)" },
+              },
+              y: {
+                title: { display: true, text: "2m 氣溫 (°C)", color: "#475569" },
+                ticks: { color: "#64748b" },
+                grid: { color: "rgba(148, 163, 184, 0.24)" },
+              },
+            },
+          },
+        });
+      }
+
+      async function synchronize(event, overrideLat, overrideLon) {
+        if (event) event.preventDefault();
+        const latitude = overrideLat ?? Number(el.latitudeInput.value);
+        const longitude = overrideLon ?? Number(el.longitudeInput.value);
+        showBanner(el.error, "");
+        showBanner(el.warning, "");
+
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          setStatus("error", "同步失敗");
+          showBanner(el.error, "請輸入有效的經緯度數值。");
+          return;
+        }
+
+        setStatus("loading", "同步中");
+        try {
+          const result = await fetchForecasts(String(latitude), String(longitude));
+          renderChart(result.aligned);
+          showBanner(el.warning, result.warning);
+          el.updatedAt.textContent = new Date().toLocaleString("zh-TW", { hour12: false });
+          setStatus("ready", `${result.aligned.labels.length} 個共同時間步長已對齊`);
+        } catch (error) {
+          setStatus("error", "同步失敗");
+          showBanner(el.error, error instanceof Error ? error.message : "資料同步時發生未知錯誤。");
+        }
+      }
+
+      async function findLocation(event) {
+        event.preventDefault();
+        const query = el.locationInput.value.trim();
+        showBanner(el.error, "");
+        el.placeResults.replaceChildren();
+
+        if (!query) {
+          showBanner(el.error, "請輸入城市或地點名稱。");
+          return;
+        }
+
+        el.locationButton.disabled = true;
+        el.locationButton.textContent = "搜尋中";
+
+        try {
+          const params = new URLSearchParams({ name: query, count: "5", language: "zh", format: "json" });
+          const data = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
+          const places = data.results || [];
+
+          if (!places.length) {
+            showBanner(el.error, "找不到符合的地點，請改用更完整的城市或地名。");
+          }
+
+          for (const place of places) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.title = `${place.latitude}, ${place.longitude}`;
+            button.innerHTML = `<strong></strong><span></span>`;
+            button.querySelector("strong").textContent = place.name;
+            button.querySelector("span").textContent = [place.admin2, place.admin1, place.country]
+              .filter(Boolean)
+              .join(" · ");
+            button.addEventListener("click", () => {
+              el.locationInput.value = [place.name, place.admin2, place.admin1, place.country]
+                .filter(Boolean)
+                .join(" · ");
+              el.latitudeInput.value = Number(place.latitude).toFixed(5);
+              el.longitudeInput.value = Number(place.longitude).toFixed(5);
+              el.placeResults.replaceChildren();
+              synchronize(null, Number(place.latitude), Number(place.longitude));
+            });
+            el.placeResults.append(button);
+          }
+        } catch (error) {
+          showBanner(el.error, error instanceof Error ? error.message : "地點搜尋時發生未知錯誤。");
+        } finally {
+          el.locationButton.disabled = false;
+          el.locationButton.textContent = "搜尋地點";
+        }
+      }
+
+      el.forecastForm.addEventListener("submit", synchronize);
+      el.locationForm.addEventListener("submit", findLocation);
+      synchronize();
+    </script>
+  </body>
+</html>
