@@ -911,7 +911,8 @@
           longitude: 121.56,
         },
       };
-      const cwaTownUrl = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
+      const cwaTownIndexUrl = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
+      const cwaTownPageUrl = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
       const cwaQpfUrl = "https://www.cwa.gov.tw/V8/C/P/QPF.html";
       const officialServices = {
         JP: {
@@ -1098,11 +1099,29 @@
         );
       }
 
+      function getCwaTownTid(place) {
+        const id = String(place.id || "");
+        if (!/^\d+$/.test(id)) return "";
+        if (/^(63|64|65|66|67|68)/.test(id)) {
+          return `${id.slice(0, 2)}${id.slice(4, 7)}00`;
+        }
+        if (/^(090|100)/.test(id)) {
+          return id.slice(0, 7);
+        }
+        return "";
+      }
+
+      function getCwaTownUrl(place) {
+        const townTid = getCwaTownTid(place);
+        return townTid ? `${cwaTownPageUrl}?TID=${encodeURIComponent(townTid)}` : cwaTownIndexUrl;
+      }
+
       function renderOfficialForecast() {
         const place = state.selectedPlace;
         el.officialTitle.textContent = `${formatPlace(place)} 官方氣象預報`;
 
         if (isTaiwanPlace(place)) {
+          const cwaTownUrl = getCwaTownUrl(place);
           el.officialForecast.innerHTML = `
             <div class="official-grid taiwan">
               <article class="official-card">
