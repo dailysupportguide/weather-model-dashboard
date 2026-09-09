@@ -5,6 +5,7 @@
 ## 功能
 
 - 以 Open-Meteo Forecast API 直接抓取 `ecmwf_ifs025` 與 `ecmwf_aifs025`
+- 以 Open-Meteo Geocoding API 搜尋城市或地點並自動帶入經緯度
 - 從 `public/deepmind_forecast.json` 讀取 DeepMind 離線推論結果
 - 以時間戳交集裁切三方資料，預設對齊未來 48 小時逐時預報
 - DeepMind JSON 缺失或時間軸不匹配時，自動降級顯示歐洲雙核心並顯示警告

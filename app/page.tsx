@@ -31,6 +31,22 @@ type AlignedForecast = {
 };
 
 type LoadState = "idle" | "loading" | "ready" | "error";
+type GeocodeState = "idle" | "searching" | "ready" | "error";
+
+type Place = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  country?: string;
+  admin1?: string;
+  admin2?: string;
+  timezone?: string;
+};
+
+type GeocodingJson = {
+  results?: Place[];
+};
 
 declare global {
   interface Window {
@@ -43,6 +59,7 @@ declare global {
 const DEFAULT_LATITUDE = 25.03;
 const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
+const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 
 function formatHourLabel(value: string) {
   const parsed = new Date(value);
@@ -174,9 +191,35 @@ async function fetchForecasts(latitude: number, longitude: number) {
   };
 }
 
+async function searchPlaces(query: string) {
+  const params = new URLSearchParams({
+    name: query,
+    count: "5",
+    language: "zh",
+    format: "json",
+  });
+  const response = await fetch(`${GEOCODING_URL}?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`地點搜尋失敗：${response.status}`);
+  }
+
+  const data = (await response.json()) as GeocodingJson;
+  return data.results ?? [];
+}
+
+function formatPlace(place: Place) {
+  return [place.name, place.admin2, place.admin1, place.country]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<{ destroy: () => void } | null>(null);
+  const [locationQuery, setLocationQuery] = useState("台北市");
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [geocodeState, setGeocodeState] = useState<GeocodeState>("idle");
   const [latitude, setLatitude] = useState(String(DEFAULT_LATITUDE));
   const [longitude, setLongitude] = useState(String(DEFAULT_LONGITUDE));
   const [chartReady, setChartReady] = useState(false);
@@ -194,14 +237,49 @@ export default function Home() {
     return "待同步";
   }, [loadState, pointCount]);
 
-  async function synchronize(event?: FormEvent) {
+  async function findLocation(event?: FormEvent) {
+    event?.preventDefault();
+
+    if (!locationQuery.trim()) {
+      setGeocodeState("error");
+      setError("請輸入城市或地點名稱。");
+      return;
+    }
+
+    setGeocodeState("searching");
+    setError("");
+
+    try {
+      const results = await searchPlaces(locationQuery.trim());
+      setPlaces(results);
+      setGeocodeState(results.length ? "ready" : "error");
+
+      if (!results.length) {
+        setError("找不到符合的地點，請改用更完整的城市或地名。");
+      }
+    } catch (caught) {
+      setGeocodeState("error");
+      setError(caught instanceof Error ? caught.message : "地點搜尋時發生未知錯誤。");
+    }
+  }
+
+  function selectPlace(place: Place) {
+    setLocationQuery(formatPlace(place));
+    setLatitude(place.latitude.toFixed(5));
+    setLongitude(place.longitude.toFixed(5));
+    setPlaces([]);
+    setGeocodeState("idle");
+    void synchronize(undefined, place.latitude, place.longitude);
+  }
+
+  async function synchronize(event?: FormEvent, overrideLat?: number, overrideLon?: number) {
     event?.preventDefault();
     setLoadState("loading");
     setError("");
     setWarning("");
 
-    const lat = Number(latitude);
-    const lon = Number(longitude);
+    const lat = overrideLat ?? Number(latitude);
+    const lon = overrideLon ?? Number(longitude);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       setLoadState("error");
@@ -329,6 +407,37 @@ export default function Home() {
       </section>
 
       <section className="control-band" aria-label="Forecast controls">
+        <form className="location-controls" onSubmit={findLocation}>
+          <label>
+            <span>地點</span>
+            <input
+              value={locationQuery}
+              onChange={(event) => setLocationQuery(event.target.value)}
+              placeholder="輸入城市、地標或行政區"
+              aria-label="Location"
+            />
+          </label>
+          <button type="submit" disabled={geocodeState === "searching"}>
+            {geocodeState === "searching" ? <span className="spinner" aria-hidden="true" /> : null}
+            搜尋地點
+          </button>
+          {places.length ? (
+            <div className="place-results" aria-label="Location search results">
+              {places.map((place) => (
+                <button
+                  key={place.id}
+                  type="button"
+                  onClick={() => selectPlace(place)}
+                  title={`${place.latitude}, ${place.longitude}`}
+                >
+                  <strong>{place.name}</strong>
+                  <span>{[place.admin2, place.admin1, place.country].filter(Boolean).join(" · ")}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </form>
+
         <form className="controls" onSubmit={synchronize}>
           <label>
             <span>Latitude</span>

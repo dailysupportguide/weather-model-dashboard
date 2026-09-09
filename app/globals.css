@@ -123,17 +123,27 @@ h1 {
   box-shadow: 0 20px 54px rgba(15, 23, 42, 0.09);
 }
 
+.location-controls {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(220px, 1fr) minmax(132px, auto);
+  gap: 14px;
+  align-items: end;
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(180px, auto);
   gap: 14px;
 }
 
+.location-controls label,
 .controls label {
   display: grid;
   gap: 7px;
 }
 
+.location-controls span,
 .controls span,
 .meta-grid span {
   color: #64748b;
@@ -141,6 +151,7 @@ h1 {
   font-weight: 800;
 }
 
+.location-controls input,
 .controls input {
   width: 100%;
   min-height: 44px;
@@ -152,11 +163,13 @@ h1 {
   outline: none;
 }
 
+.location-controls input:focus,
 .controls input:focus {
   border-color: #0284c7;
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16);
 }
 
+.location-controls button,
 .controls button {
   display: inline-flex;
   align-items: center;
@@ -173,9 +186,53 @@ h1 {
   cursor: pointer;
 }
 
+.location-controls button:disabled,
 .controls button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.place-results {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.place-results button {
+  display: grid;
+  justify-content: start;
+  gap: 4px;
+  min-height: 70px;
+  border: 1px solid #dbe5ef;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.place-results button:hover,
+.place-results button:focus-visible {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+  outline: none;
+}
+
+.place-results strong {
+  overflow: hidden;
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-results span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .meta-grid {
@@ -335,6 +392,14 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .location-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .place-results {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .meta-grid {
     grid-template-columns: 1fr;
   }
@@ -364,5 +429,9 @@ h1 {
 
   .chart-frame {
     min-height: 330px;
+  }
+
+  .place-results {
+    grid-template-columns: 1fr;
   }
 }
