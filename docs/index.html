@@ -129,6 +129,33 @@
         align-items: end;
       }
 
+      .coordinate-panel {
+        grid-column: 1 / -1;
+      }
+
+      .coordinate-panel summary {
+        width: fit-content;
+        min-height: 40px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 9px 12px;
+        color: #0f172a;
+        font-weight: 850;
+        cursor: pointer;
+      }
+
+      .coordinate-panel[open] summary {
+        margin-bottom: 12px;
+      }
+
+      .coordinate-controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(160px, auto);
+        gap: 14px;
+        align-items: end;
+      }
+
       .controls {
         display: grid;
         grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(180px, auto);
@@ -349,6 +376,12 @@
       .cwa-rain-card span {
         color: #64748b;
         font-size: 0.72rem;
+      }
+
+      .cwa-rain-card .cwa-card-time {
+        color: #334155;
+        font-size: 0.92rem;
+        font-weight: 850;
       }
 
       .cwa-rain-card strong {
@@ -586,6 +619,7 @@
         .dashboard-header,
         .control-band,
         .location-controls,
+        .coordinate-controls,
         .controls,
         .meta-grid,
         .model-registry {
@@ -646,6 +680,7 @@
         }
 
         .location-controls,
+        .coordinate-controls,
         .controls {
           gap: 10px;
         }
@@ -783,6 +818,21 @@
           <button id="locationButton" type="submit">搜尋地點</button>
           <div id="placeResults" class="place-results" aria-label="Location search results"></div>
         </form>
+
+        <details class="coordinate-panel">
+          <summary>使用經緯度查詢</summary>
+          <form id="coordinateForm" class="coordinate-controls">
+            <label>
+              <span>Latitude</span>
+              <input id="latitudeInput" value="25.03" inputmode="decimal" aria-label="Latitude" />
+            </label>
+            <label>
+              <span>Longitude</span>
+              <input id="longitudeInput" value="121.56" inputmode="decimal" aria-label="Longitude" />
+            </label>
+            <button type="submit">套用經緯度</button>
+          </form>
+        </details>
 
         <div class="meta-grid">
           <div>
@@ -994,6 +1044,9 @@
         locationForm: document.querySelector("#locationForm"),
         locationInput: document.querySelector("#locationInput"),
         locationButton: document.querySelector("#locationButton"),
+        coordinateForm: document.querySelector("#coordinateForm"),
+        latitudeInput: document.querySelector("#latitudeInput"),
+        longitudeInput: document.querySelector("#longitudeInput"),
         placeResults: document.querySelector("#placeResults"),
         updatedAt: document.querySelector("#updatedAt"),
         warning: document.querySelector("#warning"),
@@ -1155,7 +1208,7 @@
         const townTid = getCwaTownTid(place);
         if (!townTid) return null;
         if (!cwaRainCache) {
-          cwaRainCache = await fetchJson("cwa_rain_probability.json?ts=20260909");
+          cwaRainCache = await fetchJson("cwa_rain_probability.json?ts=20260910");
         }
         return cwaRainCache.towns?.[townTid] || null;
       }
@@ -1183,12 +1236,17 @@
           item.className = "cwa-rain-card";
 
           const time = document.createElement("span");
-          time.textContent = `${card.date} ${card.time}`;
+          time.className = "cwa-card-date";
+          time.textContent = card.date;
+
+          const period = document.createElement("span");
+          period.className = "cwa-card-time";
+          period.textContent = card.time;
 
           const probability = document.createElement("strong");
           probability.textContent = card.probability;
 
-          item.append(time, probability);
+          item.append(time, period, probability);
           list.append(item);
         });
         container.append(list);
@@ -1275,7 +1333,7 @@
 
         if (!taiwanTownCache) {
           try {
-            taiwanTownCache = await fetchJson("taiwan_towns.json?ts=20260909");
+            taiwanTownCache = await fetchJson("taiwan_towns.json?ts=20260910");
           } catch {
             taiwanTownCache = [];
           }
@@ -1565,6 +1623,8 @@
                 .filter(Boolean)
                 .join(" · ");
               el.placeResults.replaceChildren();
+              el.latitudeInput.value = Number(place.latitude).toFixed(5);
+              el.longitudeInput.value = Number(place.longitude).toFixed(5);
               state.selectedPlace = place;
               renderOfficialForecast();
               synchronize(null, Number(place.latitude), Number(place.longitude));
@@ -1579,7 +1639,34 @@
         }
       }
 
+      function syncCoordinates(event) {
+        event.preventDefault();
+        const latitude = Number(el.latitudeInput.value);
+        const longitude = Number(el.longitudeInput.value);
+
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          setStatus("error", "同步失敗");
+          showBanner(el.error, "請輸入有效的經緯度數值。");
+          return;
+        }
+
+        state.selectedPlace = {
+          id: `coordinate-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
+          name: "經緯度查詢",
+          country: "",
+          country_code: "",
+          source: "coordinate",
+          latitude,
+          longitude,
+        };
+        el.locationInput.value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        el.placeResults.replaceChildren();
+        renderOfficialForecast();
+        synchronize(null, latitude, longitude);
+      }
+
       el.locationForm.addEventListener("submit", findLocation);
+      el.coordinateForm.addEventListener("submit", syncCoordinates);
       renderOfficialForecast();
       synchronize();
     </script>

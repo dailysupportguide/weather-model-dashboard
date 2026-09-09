@@ -432,7 +432,7 @@ async function searchTaiwanTowns(query: string) {
   }
 
   if (!taiwanTownCache) {
-    const response = await fetch(`${TAIWAN_TOWNS_URL}?ts=20260909`);
+    const response = await fetch(`${TAIWAN_TOWNS_URL}?ts=20260910`);
     if (!response.ok) {
       return [];
     }
@@ -574,6 +574,33 @@ export default function Home() {
     setSelectedPlace(place);
     setGeocodeState("idle");
     void synchronize(undefined, place.latitude, place.longitude);
+  }
+
+  function syncCoordinates(event: FormEvent) {
+    event.preventDefault();
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      setLoadState("error");
+      setError("請輸入有效的經緯度數值。");
+      return;
+    }
+
+    const coordinatePlace: Place = {
+      id: `coordinate-${lat.toFixed(5)}-${lon.toFixed(5)}`,
+      name: "經緯度查詢",
+      country: "",
+      country_code: "",
+      source: "coordinate",
+      latitude: lat,
+      longitude: lon,
+    };
+
+    setPlaces([]);
+    setLocationQuery(`${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+    setSelectedPlace(coordinatePlace);
+    void synchronize(undefined, lat, lon);
   }
 
   async function synchronize(event?: FormEvent, overrideLat?: number, overrideLon?: number) {
@@ -760,7 +787,7 @@ export default function Home() {
     async function loadCwaRain() {
       setCwaRainLoading(true);
       try {
-        const response = await fetch(`${CWA_RAIN_PROBABILITY_URL}?ts=20260909`, {
+        const response = await fetch(`${CWA_RAIN_PROBABILITY_URL}?ts=20260910`, {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error(`CWA rain data failed: ${response.status}`);
@@ -850,6 +877,31 @@ export default function Home() {
           ) : null}
         </form>
 
+        <details className="coordinate-panel">
+          <summary>使用經緯度查詢</summary>
+          <form className="coordinate-controls" onSubmit={syncCoordinates}>
+            <label>
+              <span>Latitude</span>
+              <input
+                value={latitude}
+                onChange={(event) => setLatitude(event.target.value)}
+                inputMode="decimal"
+                aria-label="Latitude"
+              />
+            </label>
+            <label>
+              <span>Longitude</span>
+              <input
+                value={longitude}
+                onChange={(event) => setLongitude(event.target.value)}
+                inputMode="decimal"
+                aria-label="Longitude"
+              />
+            </label>
+            <button type="submit">套用經緯度</button>
+          </form>
+        </details>
+
         <div className="meta-grid">
           <div>
             <span>模式</span>
@@ -898,9 +950,8 @@ export default function Home() {
                   <div className="cwa-rain-cards">
                     {activeCwaRainEntry.cards.map((card) => (
                       <article className="cwa-rain-card" key={`${card.date}-${card.time}`}>
-                        <span>
-                          {card.date} {card.time}
-                        </span>
+                        <span className="cwa-card-date">{card.date}</span>
+                        <span className="cwa-card-time">{card.time}</span>
                         <strong>{card.probability}</strong>
                       </article>
                     ))}

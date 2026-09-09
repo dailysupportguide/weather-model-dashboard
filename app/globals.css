@@ -129,6 +129,33 @@ h1 {
   align-items: end;
 }
 
+.coordinate-panel {
+  grid-column: 1 / -1;
+}
+
+.coordinate-panel summary {
+  width: fit-content;
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 9px 12px;
+  color: #0f172a;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.coordinate-panel[open] summary {
+  margin-bottom: 12px;
+}
+
+.coordinate-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(160px, auto);
+  gap: 14px;
+  align-items: end;
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(180px, auto);
@@ -136,12 +163,14 @@ h1 {
 }
 
 .location-controls label,
+.coordinate-controls label,
 .controls label {
   display: grid;
   gap: 7px;
 }
 
 .location-controls span,
+.coordinate-controls span,
 .controls span,
 .meta-grid span {
   color: #64748b;
@@ -150,6 +179,7 @@ h1 {
 }
 
 .location-controls input,
+.coordinate-controls input,
 .controls input {
   width: 100%;
   min-height: 44px;
@@ -162,12 +192,14 @@ h1 {
 }
 
 .location-controls input:focus,
+.coordinate-controls input:focus,
 .controls input:focus {
   border-color: #0284c7;
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16);
 }
 
 .location-controls button,
+.coordinate-controls button,
 .controls button {
   display: inline-flex;
   align-items: center;
@@ -185,6 +217,7 @@ h1 {
 }
 
 .location-controls button:disabled,
+.coordinate-controls button:disabled,
 .controls button:disabled {
   cursor: wait;
   opacity: 0.72;
@@ -389,6 +422,12 @@ h1 {
   font-size: 0.72rem;
 }
 
+.cwa-rain-card .cwa-card-time {
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 850;
+}
+
 .cwa-rain-card strong {
   color: #0f766e;
   font-size: 1.12rem;
@@ -558,6 +597,10 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .coordinate-controls {
+    grid-template-columns: 1fr;
+  }
+
   .place-results {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -616,6 +659,7 @@ h1 {
   }
 
   .location-controls,
+  .coordinate-controls,
   .controls {
     gap: 10px;
   }
@@ -629,8 +673,10 @@ h1 {
   }
 
   .location-controls input,
+  .coordinate-controls input,
   .controls input,
   .location-controls button,
+  .coordinate-controls button,
   .controls button {
     min-height: 42px;
     padding: 9px 11px;
