@@ -386,10 +386,6 @@ h1 {
   background: #ffffff;
 }
 
-.official-card.official-rain iframe {
-  height: 240px;
-}
-
 .official-card.link-only {
   min-height: 180px;
   grid-template-rows: 1fr auto;
