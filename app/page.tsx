@@ -97,7 +97,6 @@ const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
 const CWA_TOWN_INDEX_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
 const CWA_TOWN_PAGE_URL = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
-const CWA_QPF_URL = "https://www.cwa.gov.tw/V8/C/P/QPF.html";
 const OFFICIAL_SERVICES: Record<string, OfficialService> = {
   JP: {
     label: "日本",
@@ -482,6 +481,15 @@ function getCwaTownUrl(place: Place) {
     : CWA_TOWN_INDEX_URL;
 }
 
+function getCwaRainProbabilityUrl(place: Place) {
+  const townTid = getCwaTownTid(place);
+  return townTid
+    ? `https://www.cwa.gov.tw/V8/C/W/Town/MOD/3hr/${encodeURIComponent(
+        townTid,
+      )}_3hr_PC.html#PC3_Po`
+    : CWA_TOWN_INDEX_URL;
+}
+
 export default function Home() {
   const temperatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const precipitationCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -725,6 +733,7 @@ export default function Home() {
     ? OFFICIAL_SERVICES[selectedPlace.country_code]
     : undefined;
   const cwaTownUrl = getCwaTownUrl(selectedPlace);
+  const cwaRainUrl = getCwaRainProbabilityUrl(selectedPlace);
 
   useEffect(() => {
     if (!isTaiwanPlace) {
@@ -831,31 +840,17 @@ export default function Home() {
 
         {isTaiwanPlace ? (
           <div className="official-grid taiwan">
-            <article className="official-card">
+            <article className="official-card official-rain">
               <div>
                 <span>中央氣象署</span>
-                <h3>鄉鎮預報</h3>
+                <h3>72 小時降雨機率</h3>
               </div>
               <a href={cwaTownUrl} target="_blank" rel="noreferrer">
-                開啟官方頁
+                開啟完整官方頁
               </a>
               <iframe
-                title="中央氣象署鄉鎮預報"
-                src={cwaFramesReady ? cwaTownUrl : undefined}
-                loading="lazy"
-              />
-            </article>
-            <article className="official-card">
-              <div>
-                <span>中央氣象署</span>
-                <h3>定量降水預報 QPF</h3>
-              </div>
-              <a href={CWA_QPF_URL} target="_blank" rel="noreferrer">
-                開啟官方頁
-              </a>
-              <iframe
-                title="中央氣象署定量降水預報"
-                src={cwaFramesReady ? CWA_QPF_URL : undefined}
+                title="中央氣象署 72 小時降雨機率"
+                src={cwaFramesReady ? cwaRainUrl : undefined}
                 loading="lazy"
               />
             </article>
