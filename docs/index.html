@@ -8,7 +8,6 @@
       name="description"
       content="Compare aligned hourly 2m temperature forecasts from ECMWF IFS, ECMWF AIFS, and Google WeatherNext 2."
     />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
     <style>
       * {
         box-sizing: border-box;
@@ -417,6 +416,77 @@
         font-size: 0.98rem;
       }
 
+      .forecast-table-wrap {
+        position: relative;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .forecast-table {
+        width: 100%;
+        min-width: 860px;
+        border-collapse: collapse;
+      }
+
+      .forecast-table th,
+      .forecast-table td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 10px 9px;
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .forecast-table th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.78rem;
+        font-weight: 850;
+      }
+
+      .forecast-table th:first-child,
+      .forecast-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        min-width: 108px;
+        text-align: left;
+        background: #ffffff;
+      }
+
+      .forecast-table th:first-child {
+        background: #f8fafc;
+      }
+
+      .forecast-table tbody tr:nth-child(even) td {
+        background: #f8fafc;
+      }
+
+      .forecast-table tbody tr:nth-child(even) td:first-child {
+        background: #f8fafc;
+      }
+
+      .metric-temp {
+        color: #0f172a;
+        font-weight: 800;
+      }
+
+      .metric-rain {
+        color: #0f766e;
+        font-weight: 800;
+      }
+
+      .table-note {
+        margin-top: 10px;
+        color: #64748b;
+        font-size: 0.82rem;
+        line-height: 1.55;
+      }
+
       .chart-frame canvas {
         min-width: 720px;
         width: 100%;
@@ -592,14 +662,14 @@
           font-size: 0.68rem;
         }
 
-        .chart-frame {
-          height: 54vh;
-          min-height: 320px;
+        .forecast-table {
+          min-width: 780px;
         }
 
-        .chart-frame.compact {
-          height: 38vh;
-          min-height: 260px;
+        .forecast-table th,
+        .forecast-table td {
+          padding: 9px 8px;
+          font-size: 0.82rem;
         }
 
         .chart-frame canvas {
@@ -663,7 +733,7 @@
         <div class="meta-grid">
           <div>
             <span>模式</span>
-            <strong>標準 48 小時</strong>
+            <strong>未來 48 小時</strong>
           </div>
           <div>
             <span>資料對齊</span>
@@ -707,8 +777,8 @@
       <section class="chart-section" aria-label="Hourly temperature comparison">
         <div class="chart-heading">
           <div>
-            <h2>逐時 2m 氣溫比較</h2>
-            <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
+            <h2>未來 48 小時逐時表格</h2>
+            <p>從目前這個小時開始，逐時列出三模型的 2m 氣溫與降雨機率 / 風險。</p>
           </div>
           <div class="legend-notes">
             <span class="ifs">IFS</span>
@@ -716,23 +786,35 @@
             <span class="deepmind">Google AI</span>
           </div>
         </div>
-        <div class="chart-frame">
+        <div class="forecast-table-wrap">
           <div id="chartLoading" class="chart-loading" hidden>
             <span>正在抓取並對齊三方資料</span>
           </div>
-          <canvas id="forecastChart" aria-label="Hourly temperature line chart"></canvas>
+          <table class="forecast-table" aria-label="48-hour model comparison table">
+            <thead>
+              <tr>
+                <th>時間</th>
+                <th>IFS 氣溫</th>
+                <th>IFS 降雨</th>
+                <th>AIFS 氣溫</th>
+                <th>AIFS 降雨</th>
+                <th>Google 氣溫</th>
+                <th>Google 降雨</th>
+              </tr>
+            </thead>
+            <tbody id="forecastTableBody">
+              <tr>
+                <td colspan="7">正在載入預報資料</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="chart-subheading">
-          <h3>逐時降雨機率 / 風險</h3>
-        </div>
-        <div class="chart-frame compact">
-          <canvas id="precipitationChart" aria-label="Hourly precipitation probability line chart"></canvas>
-        </div>
+        <p id="tableNote" class="table-note">降雨欄位會優先使用模型提供的降雨機率；若模型未提供，改以逐時降雨量換算為降雨風險。</p>
       </section>
     </main>
 
     <script>
-      const forecastMode = { forecastDays: "2" };
+      const forecastMode = { forecastHours: "48" };
       const europeanModels = [
         {
           key: "ifs",
@@ -848,9 +930,9 @@
         warning: document.querySelector("#warning"),
         error: document.querySelector("#error"),
         chartLoading: document.querySelector("#chartLoading"),
+        forecastTableBody: document.querySelector("#forecastTableBody"),
+        tableNote: document.querySelector("#tableNote"),
         europeanModels: document.querySelector("#europeanModels"),
-        canvas: document.querySelector("#forecastChart"),
-        precipitationCanvas: document.querySelector("#precipitationChart"),
         officialTitle: document.querySelector("#officialTitle"),
         officialForecast: document.querySelector("#officialForecast"),
       };
@@ -1098,7 +1180,7 @@
           longitude,
           hourly: "temperature_2m,precipitation_probability,precipitation",
           models: europeanModels.map((model) => model.modelId).join(","),
-          forecast_days: forecastMode.forecastDays,
+          forecast_hours: forecastMode.forecastHours,
           timezone: "auto",
         });
         const googleParams = new URLSearchParams({
@@ -1106,7 +1188,7 @@
           longitude,
           hourly: "temperature_2m,precipitation_probability,precipitation",
           models: googleModel.modelId,
-          forecast_days: forecastMode.forecastDays,
+          forecast_hours: forecastMode.forecastHours,
           timezone: "auto",
         });
 
@@ -1209,96 +1291,44 @@
         };
       }
 
-      function renderChart(aligned) {
-        if (state.temperatureChart) state.temperatureChart.destroy();
-        const datasets = [
-          { label: europeanModels[0].label, data: aligned.ifs, ...europeanModels[0].style },
-          { label: europeanModels[1].label, data: aligned.aifs, ...europeanModels[1].style },
-        ];
-        if (aligned.google) {
-          datasets.push({ label: googleModel.label, data: aligned.google, ...googleModel.style });
-        }
+      function formatTableTime(value) {
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return new Intl.DateTimeFormat("zh-TW", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          hour12: false,
+        }).format(parsed);
+      }
 
-        state.temperatureChart = new Chart(el.canvas, {
-          type: "line",
-          data: { labels: aligned.labels.map(formatHourLabel), datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: "index" },
-            plugins: {
-              legend: { position: "top", labels: { boxWidth: 24, boxHeight: 3, color: "#334155" } },
-              tooltip: {
-                callbacks: {
-                  label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(1)} °C`,
-                },
-              },
-            },
-            scales: {
-              x: {
-                ticks: { color: "#64748b", maxRotation: 0, autoSkipPadding: 28 },
-                grid: { color: "rgba(148, 163, 184, 0.18)" },
-              },
-              y: {
-                title: { display: true, text: "2m 氣溫 (°C)", color: "#475569" },
-                ticks: { color: "#64748b" },
-                grid: { color: "rgba(148, 163, 184, 0.24)" },
-              },
-            },
-          },
+      function formatTemp(value) {
+        return value === null || !Number.isFinite(value) ? "—" : `${Number(value).toFixed(1)}°`;
+      }
+
+      function formatRain(value) {
+        return value === null || !Number.isFinite(value) ? "—" : `${Math.round(Number(value))}%`;
+      }
+
+      function renderTable(aligned) {
+        const rows = aligned.labels.slice(0, 48).map((time, index) => {
+          const googleTemp = aligned.google ? aligned.google[index] : null;
+          const googleRain = aligned.precipitation.google ? aligned.precipitation.google[index] : null;
+          return `
+            <tr>
+              <td>${formatTableTime(time)}</td>
+              <td class="metric-temp">${formatTemp(aligned.ifs[index])}</td>
+              <td class="metric-rain">${formatRain(aligned.precipitation.ifs[index])}</td>
+              <td class="metric-temp">${formatTemp(aligned.aifs[index])}</td>
+              <td class="metric-rain">${formatRain(aligned.precipitation.aifs[index])}</td>
+              <td class="metric-temp">${formatTemp(googleTemp)}</td>
+              <td class="metric-rain">${formatRain(googleRain)}</td>
+            </tr>
+          `;
         });
 
-        if (state.precipitationChart) state.precipitationChart.destroy();
-        const precipitationDatasets = [
-          {
-            label: aligned.precipitationLabels.ifs,
-            data: aligned.precipitation.ifs,
-            ...europeanModels[0].style,
-          },
-          {
-            label: aligned.precipitationLabels.aifs,
-            data: aligned.precipitation.aifs,
-            ...europeanModels[1].style,
-          },
-        ];
-        if (aligned.precipitation.google) {
-          precipitationDatasets.push({
-            label: aligned.precipitationLabels.google,
-            data: aligned.precipitation.google,
-            ...googleModel.style,
-          });
-        }
-
-        state.precipitationChart = new Chart(el.precipitationCanvas, {
-          type: "line",
-          data: { labels: aligned.labels.map(formatHourLabel), datasets: precipitationDatasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: "index" },
-            plugins: {
-              legend: { position: "top", labels: { boxWidth: 24, boxHeight: 3, color: "#334155" } },
-              tooltip: {
-                callbacks: {
-                  label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(0)}%`,
-                },
-              },
-            },
-            scales: {
-              x: {
-                ticks: { color: "#64748b", maxRotation: 0, autoSkipPadding: 28 },
-                grid: { color: "rgba(148, 163, 184, 0.18)" },
-              },
-              y: {
-                min: 0,
-                max: 100,
-                title: { display: true, text: "降雨機率 / 風險 (%)", color: "#475569" },
-                ticks: { color: "#64748b" },
-                grid: { color: "rgba(148, 163, 184, 0.24)" },
-              },
-            },
-          },
-        });
+        el.forecastTableBody.innerHTML = rows.join("");
+        el.tableNote.textContent = `${aligned.labels.length} 個共同時間步長已對齊。${aligned.precipitationLabels.ifs}；${aligned.precipitationLabels.aifs}；${aligned.precipitationLabels.google}。`;
       }
 
       async function synchronize(event, overrideLat, overrideLon) {
@@ -1317,7 +1347,7 @@
         setStatus("loading", "同步中");
         try {
           const result = await fetchForecasts(String(latitude), String(longitude));
-          renderChart(result.aligned);
+          renderTable(result.aligned);
           showBanner(el.warning, result.warning);
           el.updatedAt.textContent = new Date().toLocaleString("zh-TW", { hour12: false });
           setStatus("ready", `${result.aligned.labels.length} 個共同時間步長已對齊`);

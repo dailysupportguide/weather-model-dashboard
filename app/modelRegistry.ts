@@ -1,7 +1,7 @@
 export const FORECAST_MODE = {
   id: "standard-48h",
-  label: "標準 48 小時",
-  forecastDays: "2",
+  label: "未來 48 小時",
+  forecastHours: "48",
   timestep: "hourly",
 };
 
@@ -58,5 +58,5 @@ export const GOOGLE_MODEL = {
 export const UPGRADE_POLICY = [
   "歐洲模型：更新 Open-Meteo modelId 與 fieldCandidates 即可切換新版本。",
   "Google 模型：優先檢查 Open-Meteo WeatherNext API；Colab adapter 作為自建推論備援。",
-  "圖表對齊：永遠以啟用模型的共同時間戳交集顯示，避免新舊模型預報長度不同。",
+  "表格對齊：永遠以啟用模型的共同時間戳交集顯示，避免新舊模型預報長度不同。",
 ];

@@ -229,7 +229,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
     longitude: String(longitude),
     hourly: "temperature_2m,precipitation_probability,precipitation",
     models: EUROPEAN_MODELS.map((model) => model.modelId).join(","),
-    forecast_days: FORECAST_MODE.forecastDays,
+    forecast_hours: FORECAST_MODE.forecastHours,
     timezone: "auto",
   });
   const googleParams = new URLSearchParams({
@@ -237,7 +237,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
     longitude: String(longitude),
     hourly: "temperature_2m,precipitation_probability,precipitation",
     models: GOOGLE_MODEL.modelId,
-    forecast_days: FORECAST_MODE.forecastDays,
+    forecast_hours: FORECAST_MODE.forecastHours,
     timezone: "auto",
   });
 
