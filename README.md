@@ -23,6 +23,10 @@ pnpm run dev
 python scripts/generate_deepmind_forecast.py --latitude 25.03 --longitude 121.56 --hours 48
 ```
 
+## Colab Notebook
+
+`notebooks/deepmind_weather_forecast_colab.ipynb` 可上傳到 Google Colab 執行。它會產生 `deepmind_forecast.json`、保存一份到 Google Drive，並提供可選的 GitHub 回推流程。
+
 目前腳本會產生符合前端 schema 的 deterministic placeholder。接入真實 WeatherNext 或 GraphCast 時，保留輸出結構即可：
 
 ```json
