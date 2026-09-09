@@ -17,9 +17,7 @@
       body {
         min-width: 320px;
         margin: 0;
-        background:
-          radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 28rem),
-          linear-gradient(180deg, #f8fafc 0%, #eef6f3 100%);
+        background: linear-gradient(180deg, #f8fafc 0%, #eef6f3 100%);
         color: #0f172a;
         font-family: Arial, "Noto Sans TC", sans-serif;
       }
@@ -61,14 +59,14 @@
 
       h1 {
         max-width: 820px;
-        font-size: clamp(2rem, 5vw, 4.8rem);
-        line-height: 1.03;
+        font-size: clamp(2rem, 4vw, 3.6rem);
+        line-height: 1.08;
         letter-spacing: 0;
       }
 
       .lead {
         max-width: 760px;
-        margin-top: 16px;
+        margin-top: 12px;
         color: #475569;
         font-size: 1.04rem;
         line-height: 1.75;
@@ -114,7 +112,7 @@
         border: 1px solid rgba(148, 163, 184, 0.45);
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.9);
-        padding: 18px;
+        padding: 16px;
         box-shadow: 0 20px 54px rgba(15, 23, 42, 0.09);
       }
 
@@ -191,7 +189,7 @@
       .place-results {
         display: grid;
         grid-column: 1 / -1;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
       }
 
@@ -319,11 +317,14 @@
 
       .chart-frame {
         position: relative;
-        height: min(58vh, 560px);
+        height: min(56vh, 520px);
         min-height: 380px;
+        overflow-x: auto;
+        overflow-y: hidden;
       }
 
       .chart-frame canvas {
+        min-width: 720px;
         width: 100%;
         height: 100%;
       }
@@ -378,32 +379,120 @@
 
       @media (max-width: 560px) {
         .dashboard-shell {
-          width: min(100% - 20px, 1180px);
-          padding-top: 22px;
+          width: min(100% - 16px, 1180px);
+          padding: 14px 0 22px;
+        }
+
+        .dashboard-header {
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+
+        .eyebrow {
+          margin-bottom: 4px;
+          font-size: 0.7rem;
         }
 
         h1 {
-          font-size: 2rem;
+          font-size: 1.42rem;
+          line-height: 1.24;
         }
 
         .lead {
-          font-size: 0.96rem;
+          margin-top: 6px;
+          font-size: 0.88rem;
+          line-height: 1.5;
+        }
+
+        .status-pill {
+          min-width: 0;
+          padding: 8px 11px;
+          font-size: 0.8rem;
+          box-shadow: none;
+        }
+
+        .control-band,
+        .chart-section {
+          padding: 12px;
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
+        }
+
+        .location-controls,
+        .controls {
+          gap: 10px;
+        }
+
+        .controls {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .controls button {
+          grid-column: 1 / -1;
+        }
+
+        input,
+        button {
+          min-height: 42px;
+          padding: 9px 11px;
+        }
+
+        .meta-grid,
+        .model-registry {
+          display: none;
+        }
+
+        .warning-banner,
+        .error-banner,
+        .chart-section {
+          margin-top: 10px;
         }
 
         .chart-heading {
-          display: grid;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+
+        .chart-heading h2 {
+          font-size: 0.98rem;
+        }
+
+        .chart-heading p {
+          display: none;
         }
 
         .legend-notes {
-          justify-content: flex-start;
+          flex: 0 0 auto;
+          gap: 5px;
+        }
+
+        .legend-notes span {
+          padding: 5px 7px;
+          font-size: 0.68rem;
         }
 
         .chart-frame {
-          min-height: 330px;
+          height: 54vh;
+          min-height: 320px;
+        }
+
+        .chart-frame canvas {
+          min-width: 760px;
         }
 
         .place-results {
           grid-template-columns: 1fr;
+          max-height: 258px;
+          overflow-y: auto;
+        }
+
+        .place-results button {
+          min-height: 58px;
+        }
+
+        .place-results strong {
+          white-space: normal;
         }
       }
     </style>
@@ -415,8 +504,7 @@
           <p class="eyebrow">Global Model Comparison</p>
           <h1>全球三核心氣象模型預測對比儀表板</h1>
           <p class="lead">
-            以未來 48 小時逐時氣溫作為三方模型交集窗口，將 ECMWF IFS、
-            ECMWF AIFS 與 Google WeatherNext 2 對齊到同一條時間軸。
+            輸入地點即可同步三大模型；台灣支援鄉鎮市區，其他地區以城市搜尋。
           </p>
         </div>
         <div id="statusPill" class="status-pill">
@@ -429,7 +517,7 @@
         <form id="locationForm" class="location-controls">
           <label>
             <span>地點</span>
-            <input id="locationInput" value="台北市" placeholder="輸入城市、地標或行政區" />
+            <input id="locationInput" value="台北市" placeholder="台灣可輸入鄉鎮市區，國外輸入城市" />
           </label>
           <button id="locationButton" type="submit">搜尋地點</button>
           <div id="placeResults" class="place-results" aria-label="Location search results"></div>
@@ -485,7 +573,7 @@
         <div class="chart-heading">
           <div>
             <h2>逐時 2m 氣溫曲線</h2>
-            <p>三條曲線只顯示共同存在的時間點，避免模型預報長度不同造成誤判。</p>
+            <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div class="legend-notes">
             <span class="ifs">IFS</span>
@@ -550,6 +638,7 @@
       };
 
       const state = { chart: null };
+      let taiwanTownCache = null;
       const el = {
         statusPill: document.querySelector("#statusPill"),
         statusText: document.querySelector("#statusText"),
@@ -620,6 +709,67 @@
         const response = await fetch(url);
         if (!response.ok) throw new Error(`${url} failed: ${response.status}`);
         return response.json();
+      }
+
+      function normalizeTaiwanText(value) {
+        return value.trim().toLowerCase().replaceAll("臺", "台").replace(/\s+/g, "");
+      }
+
+      async function searchTaiwanTowns(query) {
+        const shouldPreferTaiwan =
+          /[\u4e00-\u9fff]/.test(query) ||
+          /taiwan|tw|taipei|taichung|tainan|kaohsiung|hsinchu|keelung|chiayi|miaoli|changhua|nantou|yunlin|pingtung|yilan|hualien|taitung|penghu|kinmen|lienchiang/i.test(
+            query,
+          );
+
+        if (!shouldPreferTaiwan) return [];
+
+        if (!taiwanTownCache) {
+          try {
+            taiwanTownCache = await fetchJson("taiwan_towns.json?ts=20260909");
+          } catch {
+            taiwanTownCache = [];
+          }
+        }
+
+        const normalizedQuery = normalizeTaiwanText(query);
+        return taiwanTownCache
+          .filter((town) => {
+            const fullName = normalizeTaiwanText(`${town.county}${town.name}`);
+            return (
+              fullName.includes(normalizedQuery) ||
+              normalizeTaiwanText(town.name).includes(normalizedQuery) ||
+              normalizeTaiwanText(town.county).includes(normalizedQuery)
+            );
+          })
+          .slice(0, 6)
+          .map((town) => ({
+            id: town.id,
+            name: town.name,
+            county: town.county,
+            admin1: town.county,
+            country: "台灣",
+            latitude: town.latitude,
+            longitude: town.longitude,
+            source: "taiwan-town",
+          }));
+      }
+
+      async function searchPlaces(query) {
+        const taiwanMatches = await searchTaiwanTowns(query);
+        const params = new URLSearchParams({
+          name: query,
+          count: taiwanMatches.length ? "6" : "8",
+          language: "zh",
+          format: "json",
+        });
+        const data = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
+        const globalResults = (data.results || [])
+          .filter((place) => place.country_code !== "TW")
+          .slice(0, taiwanMatches.length ? 3 : 6)
+          .map((place) => ({ ...place, source: "global-city" }));
+
+        return [...taiwanMatches, ...globalResults];
       }
 
       async function fetchForecasts(latitude, longitude) {
@@ -772,9 +922,7 @@
         el.locationButton.textContent = "搜尋中";
 
         try {
-          const params = new URLSearchParams({ name: query, count: "5", language: "zh", format: "json" });
-          const data = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
-          const places = data.results || [];
+          const places = await searchPlaces(query);
 
           if (!places.length) {
             showBanner(el.error, "找不到符合的地點，請改用更完整的城市或地名。");
@@ -786,11 +934,16 @@
             button.title = `${place.latitude}, ${place.longitude}`;
             button.innerHTML = `<strong></strong><span></span>`;
             button.querySelector("strong").textContent = place.name;
-            button.querySelector("span").textContent = [place.admin2, place.admin1, place.country]
+            button.querySelector("span").textContent = [
+              place.source === "taiwan-town" ? "鄉鎮市區" : "城市",
+              place.county || place.admin2,
+              place.admin1,
+              place.country,
+            ]
               .filter(Boolean)
               .join(" · ");
             button.addEventListener("click", () => {
-              el.locationInput.value = [place.name, place.admin2, place.admin1, place.country]
+              el.locationInput.value = [place.name, place.county || place.admin2, place.admin1, place.country]
                 .filter(Boolean)
                 .join(" · ");
               el.latitudeInput.value = Number(place.latitude).toFixed(5);
