@@ -715,6 +715,15 @@
         return value.trim().toLowerCase().replaceAll("臺", "台").replace(/\s+/g, "");
       }
 
+      function uniquePlaceParts(parts) {
+        const seen = new Set();
+        return parts.filter((part) => {
+          if (!part || seen.has(part)) return false;
+          seen.add(part);
+          return true;
+        });
+      }
+
       async function searchTaiwanTowns(query) {
         const shouldPreferTaiwan =
           /[\u4e00-\u9fff]/.test(query) ||
@@ -934,16 +943,21 @@
             button.title = `${place.latitude}, ${place.longitude}`;
             button.innerHTML = `<strong></strong><span></span>`;
             button.querySelector("strong").textContent = place.name;
-            button.querySelector("span").textContent = [
+            button.querySelector("span").textContent = uniquePlaceParts([
               place.source === "taiwan-town" ? "鄉鎮市區" : "城市",
               place.county || place.admin2,
               place.admin1,
               place.country,
-            ]
+            ])
               .filter(Boolean)
               .join(" · ");
             button.addEventListener("click", () => {
-              el.locationInput.value = [place.name, place.county || place.admin2, place.admin1, place.country]
+              el.locationInput.value = uniquePlaceParts([
+                place.name,
+                place.county || place.admin2,
+                place.admin1,
+                place.country,
+              ])
                 .filter(Boolean)
                 .join(" · ");
               el.latitudeInput.value = Number(place.latitude).toFixed(5);
