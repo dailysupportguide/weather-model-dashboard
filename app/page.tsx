@@ -211,9 +211,14 @@ function seriesToMap(series: Series) {
 function alignForecasts(series: Series[]) {
   const [base] = series;
   const maps = series.map(seriesToMap);
-  const commonTimes = base.times.filter((time) =>
-    maps.every((map) => map.has(time)),
-  );
+  const now = Date.now();
+  const commonTimes = base.times
+    .filter((time) => maps.every((map) => map.has(time)))
+    .filter((time) => {
+      const timestamp = new Date(time).getTime();
+      return Number.isFinite(timestamp) && timestamp > now;
+    })
+    .slice(0, FORECAST_MODE.displayHours);
 
   return {
     labels: commonTimes,
@@ -341,12 +346,12 @@ async function fetchForecasts(latitude: number, longitude: number) {
       ]
     : openPrecipitationSeries;
   let precipitationAligned = alignForecasts(precipitationSeries);
-  let warning = deepmind ? "" : "Google 模型離線推論數據未就緒，僅呈現歐洲雙核心";
+  let warning = deepmind ? "" : "WNC 離線推論數據未就緒，僅呈現歐洲雙核心";
 
   if (deepmind && aligned.labels.length === 0) {
     aligned = alignForecasts(openSeries);
     precipitationAligned = alignForecasts(openPrecipitationSeries);
-    warning = "Google 模型離線推論數據時間軸未對齊，僅呈現歐洲雙核心";
+    warning = "WNC 離線推論數據時間軸未對齊，僅呈現歐洲雙核心";
   }
 
   return {
@@ -488,7 +493,7 @@ export default function Home() {
   const pointCount = aligned?.labels.length ?? 0;
   const statusText = useMemo(() => {
     if (loadState === "loading") return "同步中";
-    if (loadState === "ready") return `${pointCount} 個共同時間步長已對齊`;
+    if (loadState === "ready") return `${pointCount} 個未來共同時間步長已對齊`;
     if (loadState === "error") return "同步失敗";
     return "待同步";
   }, [loadState, pointCount]);
@@ -915,9 +920,9 @@ export default function Home() {
             <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div className="legend-notes">
-            <span className="ifs">IFS</span>
-            <span className="aifs">AIFS</span>
-            <span className="deepmind">Google AI</span>
+            <span className="ifs">歐洲傳統</span>
+            <span className="aifs">歐洲AI</span>
+            <span className="deepmind">WNC</span>
           </div>
         </div>
 

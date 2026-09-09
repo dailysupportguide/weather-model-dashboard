@@ -1,14 +1,15 @@
 export const FORECAST_MODE = {
   id: "standard-48h",
   label: "未來 48 小時",
-  forecastHours: "48",
+  forecastHours: "72",
+  displayHours: 48,
   timestep: "hourly",
 };
 
 export const EUROPEAN_MODELS = [
   {
     key: "ifs",
-    label: "ECMWF IFS 物理",
+    label: "歐洲傳統",
     provider: "Open-Meteo",
     modelId: "ecmwf_ifs025",
     fieldCandidates: ["temperature_2m_ecmwf_ifs025", "temperature_2m"],
@@ -22,7 +23,7 @@ export const EUROPEAN_MODELS = [
   },
   {
     key: "aifs",
-    label: "ECMWF AIFS 歐洲 AI",
+    label: "歐洲AI",
     provider: "Open-Meteo",
     modelId: "ecmwf_aifs025_single",
     fieldCandidates: ["temperature_2m_ecmwf_aifs025_single", "temperature_2m"],
@@ -39,7 +40,7 @@ export const EUROPEAN_MODELS = [
 
 export const GOOGLE_MODEL = {
   key: "google",
-  label: "Google WeatherNext 2",
+  label: "WNC",
   provider: "Open-Meteo Google WeatherNext 2 API",
   endpoint: "https://ensemble-api.open-meteo.com/v1/ensemble",
   modelId: "google_weathernext2_ensemble_mean",
