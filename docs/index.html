@@ -247,6 +247,7 @@
       .warning-banner,
       .error-banner,
       .model-registry,
+      .official-section,
       .chart-section {
         margin-top: 18px;
       }
@@ -268,6 +269,85 @@
         border: 1px solid #fecaca;
         background: #fef2f2;
         color: #991b1b;
+      }
+
+      .section-title-row {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      .section-title-row h2 {
+        font-size: 1.12rem;
+      }
+
+      .official-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .official-card {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.45);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 14px;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07);
+      }
+
+      .official-card > div {
+        display: grid;
+        gap: 4px;
+      }
+
+      .official-card span {
+        color: #64748b;
+        font-size: 0.76rem;
+        font-weight: 850;
+      }
+
+      .official-card h3 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .official-card p {
+        color: #64748b;
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+
+      .official-card a {
+        display: inline-flex;
+        width: fit-content;
+        min-height: 38px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 8px 12px;
+        font-size: 0.86rem;
+        font-weight: 850;
+        text-decoration: none;
+      }
+
+      .official-card iframe {
+        width: 100%;
+        height: 360px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .official-card.link-only {
+        min-height: 180px;
+        grid-template-rows: 1fr auto;
       }
 
       .chart-heading {
@@ -323,6 +403,20 @@
         overflow-y: hidden;
       }
 
+      .chart-frame.compact {
+        height: min(42vh, 360px);
+        min-height: 280px;
+      }
+
+      .chart-subheading {
+        margin: 16px 0 10px;
+      }
+
+      .chart-subheading h3 {
+        margin: 0;
+        font-size: 0.98rem;
+      }
+
       .chart-frame canvas {
         min-width: 720px;
         width: 100%;
@@ -374,6 +468,10 @@
 
         .place-results {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .official-grid {
+          grid-template-columns: 1fr;
         }
       }
 
@@ -443,8 +541,30 @@
 
         .warning-banner,
         .error-banner,
+        .official-section,
         .chart-section {
           margin-top: 10px;
+        }
+
+        .section-title-row {
+          margin-bottom: 8px;
+        }
+
+        .section-title-row h2 {
+          font-size: 0.98rem;
+        }
+
+        .official-card {
+          padding: 10px;
+          gap: 8px;
+        }
+
+        .official-card iframe {
+          height: 280px;
+        }
+
+        .official-card.link-only {
+          min-height: 142px;
         }
 
         .chart-heading {
@@ -475,6 +595,11 @@
         .chart-frame {
           height: 54vh;
           min-height: 320px;
+        }
+
+        .chart-frame.compact {
+          height: 38vh;
+          min-height: 260px;
         }
 
         .chart-frame canvas {
@@ -554,6 +679,16 @@
       <div id="warning" class="warning-banner" hidden></div>
       <div id="error" class="error-banner" hidden></div>
 
+      <section class="official-section" aria-label="Official weather forecast">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">Official Forecast</p>
+            <h2 id="officialTitle">台北市 官方氣象預報</h2>
+          </div>
+        </div>
+        <div id="officialForecast"></div>
+      </section>
+
       <section class="model-registry" aria-label="Model registry">
         <div>
           <span>歐洲模型</span>
@@ -572,7 +707,7 @@
       <section class="chart-section" aria-label="Hourly temperature comparison">
         <div class="chart-heading">
           <div>
-            <h2>逐時 2m 氣溫曲線</h2>
+            <h2>三模型逐時比較</h2>
             <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div class="legend-notes">
@@ -586,6 +721,12 @@
             <span>正在抓取並對齊三方資料</span>
           </div>
           <canvas id="forecastChart" aria-label="Hourly temperature line chart"></canvas>
+        </div>
+        <div class="chart-subheading">
+          <h3>逐時降雨機率</h3>
+        </div>
+        <div class="chart-frame compact">
+          <canvas id="precipitationChart" aria-label="Hourly precipitation probability line chart"></canvas>
         </div>
       </section>
     </main>
@@ -637,7 +778,60 @@
         },
       };
 
-      const state = { chart: null };
+      const state = {
+        temperatureChart: null,
+        precipitationChart: null,
+        selectedPlace: {
+          id: "default-taipei",
+          name: "台北市",
+          county: "台北市",
+          country: "台灣",
+          country_code: "TW",
+          source: "taiwan-town",
+          latitude: 25.03,
+          longitude: 121.56,
+        },
+      };
+      const cwaTownUrl = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
+      const cwaQpfUrl = "https://www.cwa.gov.tw/V8/C/P/QPF.html";
+      const officialServices = {
+        JP: {
+          label: "日本",
+          agency: "Japan Meteorological Agency",
+          forecastUrl: "https://www.jma.go.jp/bosai/forecast/",
+          rainUrl: "https://www.jma.go.jp/bosai/nowc/",
+        },
+        US: {
+          label: "美國",
+          agency: "National Weather Service",
+          forecastUrl: "https://www.weather.gov/",
+          rainUrl: "https://www.wpc.ncep.noaa.gov/qpf/qpf2.shtml",
+        },
+        GB: {
+          label: "英國",
+          agency: "Met Office",
+          forecastUrl: "https://www.metoffice.gov.uk/weather/forecast/",
+          rainUrl: "https://www.metoffice.gov.uk/weather/maps-and-charts/rainfall-radar-forecast-map",
+        },
+        AU: {
+          label: "澳洲",
+          agency: "Bureau of Meteorology",
+          forecastUrl: "https://www.bom.gov.au/places/",
+          rainUrl: "https://www.bom.gov.au/australia/radar/",
+        },
+        CA: {
+          label: "加拿大",
+          agency: "Environment and Climate Change Canada",
+          forecastUrl: "https://weather.gc.ca/canada_e.html",
+          rainUrl: "https://weather.gc.ca/radar/",
+        },
+        KR: {
+          label: "韓國",
+          agency: "Korea Meteorological Administration",
+          forecastUrl: "https://www.weather.go.kr/w/index.do",
+          rainUrl: "https://www.weather.go.kr/w/image/radar.do",
+        },
+      };
       let taiwanTownCache = null;
       const el = {
         statusPill: document.querySelector("#statusPill"),
@@ -656,6 +850,9 @@
         chartLoading: document.querySelector("#chartLoading"),
         europeanModels: document.querySelector("#europeanModels"),
         canvas: document.querySelector("#forecastChart"),
+        precipitationCanvas: document.querySelector("#precipitationChart"),
+        officialTitle: document.querySelector("#officialTitle"),
+        officialForecast: document.querySelector("#officialForecast"),
       };
 
       el.europeanModels.textContent = europeanModels.map((model) => model.modelId).join(" / ");
@@ -724,6 +921,73 @@
         });
       }
 
+      function formatPlace(place) {
+        return uniquePlaceParts([place.name, place.county || place.admin2, place.admin1, place.country])
+          .filter(Boolean)
+          .join(" · ");
+      }
+
+      function isTaiwanPlace(place) {
+        return (
+          place.source === "taiwan-town" ||
+          place.country_code === "TW" ||
+          place.country === "台灣" ||
+          place.country === "台湾"
+        );
+      }
+
+      function renderOfficialForecast() {
+        const place = state.selectedPlace;
+        el.officialTitle.textContent = `${formatPlace(place)} 官方氣象預報`;
+
+        if (isTaiwanPlace(place)) {
+          el.officialForecast.innerHTML = `
+            <div class="official-grid taiwan">
+              <article class="official-card">
+                <div>
+                  <span>中央氣象署</span>
+                  <h3>鄉鎮預報</h3>
+                </div>
+                <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟官方頁</a>
+                <iframe title="中央氣象署鄉鎮預報" src="${cwaTownUrl}" loading="lazy"></iframe>
+              </article>
+              <article class="official-card">
+                <div>
+                  <span>中央氣象署</span>
+                  <h3>定量降水預報 QPF</h3>
+                </div>
+                <a href="${cwaQpfUrl}" target="_blank" rel="noreferrer">開啟官方頁</a>
+                <iframe title="中央氣象署定量降水預報" src="${cwaQpfUrl}" loading="lazy"></iframe>
+              </article>
+            </div>
+          `;
+          return;
+        }
+
+        const service = officialServices[place.country_code] || null;
+        const memberUrl = "https://public.wmo.int/en/about-us/members";
+        el.officialForecast.innerHTML = `
+          <div class="official-grid">
+            <article class="official-card link-only">
+              <div>
+                <span>${service?.label || place.country || "Global"}</span>
+                <h3>${service?.agency || "官方氣象服務入口"}</h3>
+                <p>依所選城市查詢當地官方天氣與降雨預報。</p>
+              </div>
+              <a href="${service?.forecastUrl || memberUrl}" target="_blank" rel="noreferrer">開啟官方預報</a>
+            </article>
+            <article class="official-card link-only">
+              <div>
+                <span>Rain Forecast</span>
+                <h3>官方降雨預報</h3>
+                <p>優先連到該國氣象單位的雷達、QPF 或降雨預報頁。</p>
+              </div>
+              <a href="${service?.rainUrl || memberUrl}" target="_blank" rel="noreferrer">開啟降雨預報</a>
+            </article>
+          </div>
+        `;
+      }
+
       async function searchTaiwanTowns(query) {
         const shouldPreferTaiwan =
           /[\u4e00-\u9fff]/.test(query) ||
@@ -785,7 +1049,7 @@
         const europeanParams = new URLSearchParams({
           latitude,
           longitude,
-          hourly: "temperature_2m",
+          hourly: "temperature_2m,precipitation_probability",
           models: europeanModels.map((model) => model.modelId).join(","),
           forecast_days: forecastMode.forecastDays,
           timezone: "auto",
@@ -793,7 +1057,7 @@
         const googleParams = new URLSearchParams({
           latitude,
           longitude,
-          hourly: "temperature_2m",
+          hourly: "temperature_2m,precipitation_probability",
           models: googleModel.modelId,
           forecast_days: forecastMode.forecastDays,
           timezone: "auto",
@@ -815,7 +1079,20 @@
             values: forecast.values,
           };
         });
+        const europeanPrecipitationSeries = europeanModels.map((model) => {
+          const forecast = pickSeries(europeanData, [
+            `precipitation_probability_${model.modelId}`,
+            "precipitation_probability",
+          ]);
+          return {
+            label: model.label,
+            source: `${model.key}-precipitation`,
+            times: forecast.time,
+            values: forecast.values,
+          };
+        });
         const googleForecast = pickSeries(googleData, googleModel.fieldCandidates);
+        const googlePrecipitation = pickSeries(googleData, ["precipitation_probability"]);
         const allSeries = [
           ...europeanSeries,
           {
@@ -826,14 +1103,28 @@
           },
         ];
         const aligned = alignForecasts(allSeries);
+        const precipitationAligned = alignForecasts([
+          ...europeanPrecipitationSeries,
+          {
+            label: googleModel.label,
+            source: "google-precipitation",
+            times: googlePrecipitation.time,
+            values: googlePrecipitation.values,
+          },
+        ]);
 
         if (!aligned.labels.length) {
           const europeanOnly = alignForecasts(europeanSeries);
+          const europeanPrecipitationOnly = alignForecasts(europeanPrecipitationSeries);
           return {
             aligned: {
               labels: europeanOnly.labels,
               ifs: europeanOnly.values[0],
               aifs: europeanOnly.values[1],
+              precipitation: {
+                ifs: europeanPrecipitationOnly.values[0] || [],
+                aifs: europeanPrecipitationOnly.values[1] || [],
+              },
             },
             warning: "Google 模型資料時間軸未對齊，僅呈現歐洲雙核心",
           };
@@ -845,13 +1136,18 @@
             ifs: aligned.values[0],
             aifs: aligned.values[1],
             google: aligned.values[2],
+            precipitation: {
+              ifs: precipitationAligned.values[0] || [],
+              aifs: precipitationAligned.values[1] || [],
+              google: precipitationAligned.values[2],
+            },
           },
           warning: "",
         };
       }
 
       function renderChart(aligned) {
-        if (state.chart) state.chart.destroy();
+        if (state.temperatureChart) state.temperatureChart.destroy();
         const datasets = [
           { label: europeanModels[0].label, data: aligned.ifs, ...europeanModels[0].style },
           { label: europeanModels[1].label, data: aligned.aifs, ...europeanModels[1].style },
@@ -860,7 +1156,7 @@
           datasets.push({ label: googleModel.label, data: aligned.google, ...googleModel.style });
         }
 
-        state.chart = new Chart(el.canvas, {
+        state.temperatureChart = new Chart(el.canvas, {
           type: "line",
           data: { labels: aligned.labels.map(formatHourLabel), datasets },
           options: {
@@ -882,6 +1178,58 @@
               },
               y: {
                 title: { display: true, text: "2m 氣溫 (°C)", color: "#475569" },
+                ticks: { color: "#64748b" },
+                grid: { color: "rgba(148, 163, 184, 0.24)" },
+              },
+            },
+          },
+        });
+
+        if (state.precipitationChart) state.precipitationChart.destroy();
+        const precipitationDatasets = [
+          {
+            label: `${europeanModels[0].label} 降雨機率`,
+            data: aligned.precipitation.ifs,
+            ...europeanModels[0].style,
+          },
+          {
+            label: `${europeanModels[1].label} 降雨機率`,
+            data: aligned.precipitation.aifs,
+            ...europeanModels[1].style,
+          },
+        ];
+        if (aligned.precipitation.google) {
+          precipitationDatasets.push({
+            label: `${googleModel.label} 降雨機率`,
+            data: aligned.precipitation.google,
+            ...googleModel.style,
+          });
+        }
+
+        state.precipitationChart = new Chart(el.precipitationCanvas, {
+          type: "line",
+          data: { labels: aligned.labels.map(formatHourLabel), datasets: precipitationDatasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: "index" },
+            plugins: {
+              legend: { position: "top", labels: { boxWidth: 24, boxHeight: 3, color: "#334155" } },
+              tooltip: {
+                callbacks: {
+                  label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(0)}%`,
+                },
+              },
+            },
+            scales: {
+              x: {
+                ticks: { color: "#64748b", maxRotation: 0, autoSkipPadding: 28 },
+                grid: { color: "rgba(148, 163, 184, 0.18)" },
+              },
+              y: {
+                min: 0,
+                max: 100,
+                title: { display: true, text: "降雨機率 (%)", color: "#475569" },
                 ticks: { color: "#64748b" },
                 grid: { color: "rgba(148, 163, 184, 0.24)" },
               },
@@ -963,6 +1311,8 @@
               el.latitudeInput.value = Number(place.latitude).toFixed(5);
               el.longitudeInput.value = Number(place.longitude).toFixed(5);
               el.placeResults.replaceChildren();
+              state.selectedPlace = place;
+              renderOfficialForecast();
               synchronize(null, Number(place.latitude), Number(place.longitude));
             });
             el.placeResults.append(button);
@@ -977,6 +1327,7 @@
 
       el.forecastForm.addEventListener("submit", synchronize);
       el.locationForm.addEventListener("submit", findLocation);
+      renderOfficialForecast();
       synchronize();
     </script>
   </body>
