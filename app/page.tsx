@@ -60,7 +60,7 @@ type Place = {
   admin2?: string;
   timezone?: string;
   county?: string;
-  source?: "taiwan-town" | "global-city";
+  source?: "taiwan-town" | "global-city" | "coordinate";
 };
 
 type GeocodingJson = {
@@ -502,6 +502,27 @@ function getCwaTownUrl(place: Place) {
     : CWA_TOWN_INDEX_URL;
 }
 
+function extractCoordinates(value: string) {
+  const normalized = value.trim().replaceAll("，", ",");
+  const patterns = [
+    /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+    /(?:lat(?:itude)?\s*[:=]?\s*)?(-?\d+(?:\.\d+)?)\s*,\s*(?:lon(?:gitude)?\s*[:=]?\s*)?(-?\d+(?:\.\d+)?)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const lat = Number(match[1]);
+    const lon = Number(match[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+      return { latitude: lat, longitude: lon };
+    }
+  }
+
+  return null;
+}
+
 export default function Home() {
   const temperatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const precipitationCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -512,6 +533,8 @@ export default function Home() {
   const [geocodeState, setGeocodeState] = useState<GeocodeState>("idle");
   const [latitude, setLatitude] = useState(String(DEFAULT_LATITUDE));
   const [longitude, setLongitude] = useState(String(DEFAULT_LONGITUDE));
+  const [googleCoordinateQuery, setGoogleCoordinateQuery] = useState("");
+  const [googleCoordinateInput, setGoogleCoordinateInput] = useState("");
   const [chartReady, setChartReady] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [aligned, setAligned] = useState<AlignedForecast | null>(null);
@@ -601,6 +624,31 @@ export default function Home() {
     setLocationQuery(`${lat.toFixed(5)}, ${lon.toFixed(5)}`);
     setSelectedPlace(coordinatePlace);
     void synchronize(undefined, lat, lon);
+  }
+
+  function openGoogleCoordinateSearch(event: FormEvent) {
+    event.preventDefault();
+    const query = googleCoordinateQuery.trim() || locationQuery.trim();
+    if (!query) {
+      setError("請輸入要用 Google 查詢的地點。");
+      return;
+    }
+
+    const url = `https://www.google.com/search?q=${encodeURIComponent(`${query} 經緯度`)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function applyGoogleCoordinateInput(event: FormEvent) {
+    event.preventDefault();
+    const coordinates = extractCoordinates(googleCoordinateInput);
+    if (!coordinates) {
+      setError("無法辨識座標，請貼上 Google Maps 網址或 25.03300, 121.56500 這種格式。");
+      return;
+    }
+
+    setError("");
+    setLatitude(coordinates.latitude.toFixed(5));
+    setLongitude(coordinates.longitude.toFixed(5));
   }
 
   async function synchronize(event?: FormEvent, overrideLat?: number, overrideLon?: number) {
@@ -879,6 +927,30 @@ export default function Home() {
 
         <details className="coordinate-panel">
           <summary>使用經緯度查詢</summary>
+          <form className="google-coordinate-controls" onSubmit={openGoogleCoordinateSearch}>
+            <label>
+              <span>Google 搜尋</span>
+              <input
+                value={googleCoordinateQuery}
+                onChange={(event) => setGoogleCoordinateQuery(event.target.value)}
+                placeholder="輸入地點快速查經緯度"
+                aria-label="Google coordinate search"
+              />
+            </label>
+            <button type="submit">Google 查座標</button>
+          </form>
+          <form className="google-coordinate-controls" onSubmit={applyGoogleCoordinateInput}>
+            <label>
+              <span>貼上座標或 Google Maps 網址</span>
+              <input
+                value={googleCoordinateInput}
+                onChange={(event) => setGoogleCoordinateInput(event.target.value)}
+                placeholder="25.03300, 121.56500"
+                aria-label="Paste Google coordinates"
+              />
+            </label>
+            <button type="submit">整理座標</button>
+          </form>
           <form className="coordinate-controls" onSubmit={syncCoordinates}>
             <label>
               <span>Latitude</span>

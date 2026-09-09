@@ -156,6 +156,18 @@ h1 {
   align-items: end;
 }
 
+.google-coordinate-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(132px, auto);
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.google-coordinate-controls button {
+  background: #334155;
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(180px, auto);
@@ -164,6 +176,7 @@ h1 {
 
 .location-controls label,
 .coordinate-controls label,
+.google-coordinate-controls label,
 .controls label {
   display: grid;
   gap: 7px;
@@ -171,6 +184,7 @@ h1 {
 
 .location-controls span,
 .coordinate-controls span,
+.google-coordinate-controls span,
 .controls span,
 .meta-grid span {
   color: #64748b;
@@ -180,6 +194,7 @@ h1 {
 
 .location-controls input,
 .coordinate-controls input,
+.google-coordinate-controls input,
 .controls input {
   width: 100%;
   min-height: 44px;
@@ -193,6 +208,7 @@ h1 {
 
 .location-controls input:focus,
 .coordinate-controls input:focus,
+.google-coordinate-controls input:focus,
 .controls input:focus {
   border-color: #0284c7;
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16);
@@ -200,6 +216,7 @@ h1 {
 
 .location-controls button,
 .coordinate-controls button,
+.google-coordinate-controls button,
 .controls button {
   display: inline-flex;
   align-items: center;
@@ -218,6 +235,7 @@ h1 {
 
 .location-controls button:disabled,
 .coordinate-controls button:disabled,
+.google-coordinate-controls button:disabled,
 .controls button:disabled {
   cursor: wait;
   opacity: 0.72;
@@ -601,6 +619,10 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .google-coordinate-controls {
+    grid-template-columns: 1fr;
+  }
+
   .place-results {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -660,6 +682,7 @@ h1 {
 
   .location-controls,
   .coordinate-controls,
+  .google-coordinate-controls,
   .controls {
     gap: 10px;
   }
@@ -674,9 +697,11 @@ h1 {
 
   .location-controls input,
   .coordinate-controls input,
+  .google-coordinate-controls input,
   .controls input,
   .location-controls button,
   .coordinate-controls button,
+  .google-coordinate-controls button,
   .controls button {
     min-height: 42px;
     padding: 9px 11px;
