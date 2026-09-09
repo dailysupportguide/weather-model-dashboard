@@ -481,15 +481,6 @@ function getCwaTownUrl(place: Place) {
     : CWA_TOWN_INDEX_URL;
 }
 
-function getCwaRainProbabilityUrl(place: Place) {
-  const townTid = getCwaTownTid(place);
-  return townTid
-    ? `https://www.cwa.gov.tw/V8/C/W/Town/MOD/3hr/${encodeURIComponent(
-        townTid,
-      )}_3hr_PC.html#PC3_Po`
-    : CWA_TOWN_INDEX_URL;
-}
-
 export default function Home() {
   const temperatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const precipitationCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -506,7 +497,6 @@ export default function Home() {
   const [warning, setWarning] = useState("");
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState("");
-  const [cwaFramesReady, setCwaFramesReady] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place>({
     id: "default-taipei",
     name: "台北市",
@@ -558,7 +548,6 @@ export default function Home() {
     setLongitude(place.longitude.toFixed(5));
     setPlaces([]);
     setSelectedPlace(place);
-    setCwaFramesReady(false);
     setGeocodeState("idle");
     void synchronize(undefined, place.latitude, place.longitude);
   }
@@ -733,16 +722,6 @@ export default function Home() {
     ? OFFICIAL_SERVICES[selectedPlace.country_code]
     : undefined;
   const cwaTownUrl = getCwaTownUrl(selectedPlace);
-  const cwaRainUrl = getCwaRainProbabilityUrl(selectedPlace);
-
-  useEffect(() => {
-    if (!isTaiwanPlace) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setCwaFramesReady(true), 1500);
-    return () => window.clearTimeout(timer);
-  }, [isTaiwanPlace, selectedPlace.id]);
 
   return (
     <main className="dashboard-shell">
@@ -840,19 +819,14 @@ export default function Home() {
 
         {isTaiwanPlace ? (
           <div className="official-grid taiwan">
-            <article className="official-card official-rain">
+            <article className="official-card link-only">
               <div>
                 <span>中央氣象署</span>
-                <h3>72 小時降雨機率</h3>
+                <h3>CWA 72 小時降雨機率</h3>
               </div>
               <a href={cwaTownUrl} target="_blank" rel="noreferrer">
-                開啟完整官方頁
+                開啟 CWA 預報
               </a>
-              <iframe
-                title="中央氣象署 72 小時降雨機率"
-                src={cwaFramesReady ? cwaRainUrl : undefined}
-                loading="lazy"
-              />
             </article>
           </div>
         ) : (
