@@ -95,7 +95,8 @@ const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
-const CWA_TOWN_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
+const CWA_TOWN_INDEX_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
+const CWA_TOWN_PAGE_URL = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
 const CWA_QPF_URL = "https://www.cwa.gov.tw/V8/C/P/QPF.html";
 const OFFICIAL_SERVICES: Record<string, OfficialService> = {
   JP: {
@@ -462,6 +463,25 @@ function normalizeTaiwanText(value: string) {
     .replace(/\s+/g, "");
 }
 
+function getCwaTownTid(place: Place) {
+  const id = String(place.id || "");
+  if (!/^\d+$/.test(id)) return "";
+  if (/^(63|64|65|66|67|68)/.test(id)) {
+    return `${id.slice(0, 2)}${id.slice(4, 7)}00`;
+  }
+  if (/^(090|100)/.test(id)) {
+    return id.slice(0, 7);
+  }
+  return "";
+}
+
+function getCwaTownUrl(place: Place) {
+  const townTid = getCwaTownTid(place);
+  return townTid
+    ? `${CWA_TOWN_PAGE_URL}?TID=${encodeURIComponent(townTid)}`
+    : CWA_TOWN_INDEX_URL;
+}
+
 export default function Home() {
   const temperatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const precipitationCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -704,6 +724,7 @@ export default function Home() {
   const officialService = selectedPlace.country_code
     ? OFFICIAL_SERVICES[selectedPlace.country_code]
     : undefined;
+  const cwaTownUrl = getCwaTownUrl(selectedPlace);
 
   useEffect(() => {
     if (!isTaiwanPlace) {
@@ -815,12 +836,12 @@ export default function Home() {
                 <span>中央氣象署</span>
                 <h3>鄉鎮預報</h3>
               </div>
-              <a href={CWA_TOWN_URL} target="_blank" rel="noreferrer">
+              <a href={cwaTownUrl} target="_blank" rel="noreferrer">
                 開啟官方頁
               </a>
               <iframe
                 title="中央氣象署鄉鎮預報"
-                src={cwaFramesReady ? CWA_TOWN_URL : undefined}
+                src={cwaFramesReady ? cwaTownUrl : undefined}
                 loading="lazy"
               />
             </article>
