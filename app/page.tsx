@@ -781,31 +781,6 @@ export default function Home() {
           ) : null}
         </form>
 
-        <form className="controls" onSubmit={synchronize}>
-          <label>
-            <span>Latitude</span>
-            <input
-              value={latitude}
-              inputMode="decimal"
-              onChange={(event) => setLatitude(event.target.value)}
-              aria-label="Latitude"
-            />
-          </label>
-          <label>
-            <span>Longitude</span>
-            <input
-              value={longitude}
-              inputMode="decimal"
-              onChange={(event) => setLongitude(event.target.value)}
-              aria-label="Longitude"
-            />
-          </label>
-          <button type="submit" disabled={loadState === "loading" || !chartReady}>
-            {loadState === "loading" ? <span className="spinner" aria-hidden="true" /> : null}
-            手動同步座標
-          </button>
-        </form>
-
         <div className="meta-grid">
           <div>
             <span>模式</span>
