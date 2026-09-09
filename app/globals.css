@@ -363,6 +363,37 @@ h1 {
   line-height: 1.55;
 }
 
+.cwa-rain-meta {
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.cwa-rain-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.cwa-rain-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.cwa-rain-card span {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.cwa-rain-card strong {
+  color: #0f766e;
+  font-size: 1.12rem;
+}
+
 .official-card a {
   display: inline-flex;
   width: fit-content;

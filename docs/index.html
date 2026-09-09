@@ -325,6 +325,37 @@
         line-height: 1.55;
       }
 
+      .cwa-rain-meta {
+        color: #64748b;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .cwa-rain-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+        gap: 8px;
+      }
+
+      .cwa-rain-card {
+        display: grid;
+        gap: 5px;
+        border: 1px solid #dbe5ef;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 10px;
+      }
+
+      .cwa-rain-card span {
+        color: #64748b;
+        font-size: 0.72rem;
+      }
+
+      .cwa-rain-card strong {
+        color: #0f766e;
+        font-size: 1.12rem;
+      }
+
       .official-card a {
         display: inline-flex;
         width: fit-content;
@@ -915,6 +946,7 @@
           longitude: 121.56,
         },
       };
+      let cwaRainCache = null;
       const cwaTownIndexUrl = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
       const cwaTownPageUrl = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
       const officialServices = {
@@ -1119,6 +1151,61 @@
         return townTid ? `${cwaTownPageUrl}?TID=${encodeURIComponent(townTid)}` : cwaTownIndexUrl;
       }
 
+      async function getCwaRainEntry(place) {
+        const townTid = getCwaTownTid(place);
+        if (!townTid) return null;
+        if (!cwaRainCache) {
+          cwaRainCache = await fetchJson("cwa_rain_probability.json?ts=20260909");
+        }
+        return cwaRainCache.towns?.[townTid] || null;
+      }
+
+      function renderCwaRainCards(container, entry) {
+        container.replaceChildren();
+
+        if (!entry?.cards?.length) {
+          const fallback = document.createElement("p");
+          fallback.className = "cwa-rain-meta";
+          fallback.textContent = "目前尚未取得 CWA 72 小時降雨機率資料。";
+          container.append(fallback);
+          return;
+        }
+
+        const meta = document.createElement("p");
+        meta.className = "cwa-rain-meta";
+        meta.textContent = `${entry.county}${entry.name}，資料時間：${entry.updated_at || cwaRainCache.generated_at}`;
+        container.append(meta);
+
+        const list = document.createElement("div");
+        list.className = "cwa-rain-cards";
+        entry.cards.forEach((card) => {
+          const item = document.createElement("article");
+          item.className = "cwa-rain-card";
+
+          const time = document.createElement("span");
+          time.textContent = `${card.date} ${card.time}`;
+
+          const probability = document.createElement("strong");
+          probability.textContent = card.probability;
+
+          item.append(time, probability);
+          list.append(item);
+        });
+        container.append(list);
+      }
+
+      async function hydrateCwaRainCards(place) {
+        const container = document.querySelector("#cwaRainCards");
+        if (!container) return;
+        try {
+          const entry = await getCwaRainEntry(place);
+          if (state.selectedPlace.id !== place.id) return;
+          renderCwaRainCards(container, entry);
+        } catch {
+          renderCwaRainCards(container, null);
+        }
+      }
+
       function renderOfficialForecast() {
         const place = state.selectedPlace;
         el.officialTitle.textContent = `${formatPlace(place)} 官方氣象預報`;
@@ -1127,15 +1214,19 @@
           const cwaTownUrl = getCwaTownUrl(place);
           el.officialForecast.innerHTML = `
             <div class="official-grid taiwan">
-              <article class="official-card link-only">
+              <article class="official-card">
                 <div>
                   <span>中央氣象署</span>
                   <h3>CWA 72 小時降雨機率</h3>
+                </div>
+                <div id="cwaRainCards">
+                  <p class="cwa-rain-meta">載入 CWA 降雨機率中。</p>
                 </div>
                 <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟 CWA 預報</a>
               </article>
             </div>
           `;
+          hydrateCwaRainCards(place);
           return;
         }
 

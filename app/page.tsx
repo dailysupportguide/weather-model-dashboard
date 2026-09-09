@@ -75,6 +75,26 @@ type TaiwanTown = {
   longitude: number;
 };
 
+type CwaRainCard = {
+  date: string;
+  time: string;
+  probability: string;
+};
+
+type CwaRainEntry = {
+  id: string;
+  tid: string;
+  name: string;
+  county: string;
+  updated_at?: string | null;
+  cards: CwaRainCard[];
+};
+
+type CwaRainJson = {
+  generated_at?: string;
+  towns?: Record<string, CwaRainEntry>;
+};
+
 type OfficialService = {
   label: string;
   agency: string;
@@ -95,6 +115,7 @@ const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
+const CWA_RAIN_PROBABILITY_URL = "/cwa_rain_probability.json";
 const CWA_TOWN_INDEX_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
 const CWA_TOWN_PAGE_URL = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
 const OFFICIAL_SERVICES: Record<string, OfficialService> = {
@@ -497,6 +518,9 @@ export default function Home() {
   const [warning, setWarning] = useState("");
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState("");
+  const [cwaRainEntry, setCwaRainEntry] = useState<CwaRainEntry | null>(null);
+  const [cwaRainGeneratedAt, setCwaRainGeneratedAt] = useState("");
+  const [cwaRainLoading, setCwaRainLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place>({
     id: "default-taipei",
     name: "台北市",
@@ -722,6 +746,42 @@ export default function Home() {
     ? OFFICIAL_SERVICES[selectedPlace.country_code]
     : undefined;
   const cwaTownUrl = getCwaTownUrl(selectedPlace);
+  const selectedCwaTid = isTaiwanPlace ? getCwaTownTid(selectedPlace) : "";
+  const activeCwaRainEntry =
+    selectedCwaTid && cwaRainEntry?.tid === selectedCwaTid ? cwaRainEntry : null;
+
+  useEffect(() => {
+    if (!selectedCwaTid) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadCwaRain() {
+      setCwaRainLoading(true);
+      try {
+        const response = await fetch(`${CWA_RAIN_PROBABILITY_URL}?ts=20260909`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`CWA rain data failed: ${response.status}`);
+        const data = (await response.json()) as CwaRainJson;
+        setCwaRainEntry(data.towns?.[selectedCwaTid] ?? null);
+        setCwaRainGeneratedAt(data.generated_at ?? "");
+      } catch {
+        if (!controller.signal.aborted) {
+          setCwaRainEntry(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCwaRainLoading(false);
+        }
+      }
+    }
+
+    void loadCwaRain();
+
+    return () => controller.abort();
+  }, [selectedCwaTid]);
 
   return (
     <main className="dashboard-shell">
@@ -819,10 +879,33 @@ export default function Home() {
 
         {isTaiwanPlace ? (
           <div className="official-grid taiwan">
-            <article className="official-card link-only">
+            <article className="official-card">
               <div>
                 <span>中央氣象署</span>
                 <h3>CWA 72 小時降雨機率</h3>
+              </div>
+              <div>
+                <p className="cwa-rain-meta">
+                  {cwaRainLoading
+                    ? "載入 CWA 降雨機率中。"
+                    : activeCwaRainEntry
+                      ? `${activeCwaRainEntry.county}${activeCwaRainEntry.name}，資料時間：${
+                          activeCwaRainEntry.updated_at || cwaRainGeneratedAt
+                        }`
+                      : "目前尚未取得 CWA 72 小時降雨機率資料。"}
+                </p>
+                {activeCwaRainEntry?.cards?.length ? (
+                  <div className="cwa-rain-cards">
+                    {activeCwaRainEntry.cards.map((card) => (
+                      <article className="cwa-rain-card" key={`${card.date}-${card.time}`}>
+                        <span>
+                          {card.date} {card.time}
+                        </span>
+                        <strong>{card.probability}</strong>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <a href={cwaTownUrl} target="_blank" rel="noreferrer">
                 開啟 CWA 預報
