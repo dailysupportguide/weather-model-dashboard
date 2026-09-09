@@ -33,6 +33,11 @@ type AlignedForecast = {
   ifs: Array<number | null>;
   aifs: Array<number | null>;
   deepmind?: Array<number | null>;
+  precipitation: {
+    ifs: Array<number | null>;
+    aifs: Array<number | null>;
+    deepmind?: Array<number | null>;
+  };
 };
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -64,6 +69,13 @@ type TaiwanTown = {
   longitude: number;
 };
 
+type OfficialService = {
+  label: string;
+  agency: string;
+  forecastUrl: string;
+  rainUrl: string;
+};
+
 declare global {
   interface Window {
     Chart?: new (canvas: HTMLCanvasElement, config: Record<string, unknown>) => {
@@ -77,6 +89,46 @@ const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
+const CWA_TOWN_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
+const CWA_QPF_URL = "https://www.cwa.gov.tw/V8/C/P/QPF.html";
+const OFFICIAL_SERVICES: Record<string, OfficialService> = {
+  JP: {
+    label: "日本",
+    agency: "Japan Meteorological Agency",
+    forecastUrl: "https://www.jma.go.jp/bosai/forecast/",
+    rainUrl: "https://www.jma.go.jp/bosai/nowc/",
+  },
+  US: {
+    label: "美國",
+    agency: "National Weather Service",
+    forecastUrl: "https://www.weather.gov/",
+    rainUrl: "https://www.wpc.ncep.noaa.gov/qpf/qpf2.shtml",
+  },
+  GB: {
+    label: "英國",
+    agency: "Met Office",
+    forecastUrl: "https://www.metoffice.gov.uk/weather/forecast/",
+    rainUrl: "https://www.metoffice.gov.uk/weather/maps-and-charts/rainfall-radar-forecast-map",
+  },
+  AU: {
+    label: "澳洲",
+    agency: "Bureau of Meteorology",
+    forecastUrl: "https://www.bom.gov.au/places/",
+    rainUrl: "https://www.bom.gov.au/australia/radar/",
+  },
+  CA: {
+    label: "加拿大",
+    agency: "Environment and Climate Change Canada",
+    forecastUrl: "https://weather.gc.ca/canada_e.html",
+    rainUrl: "https://weather.gc.ca/radar/",
+  },
+  KR: {
+    label: "韓國",
+    agency: "Korea Meteorological Administration",
+    forecastUrl: "https://www.weather.go.kr/w/index.do",
+    rainUrl: "https://www.weather.go.kr/w/image/radar.do",
+  },
+};
 
 let taiwanTownCache: TaiwanTown[] | null = null;
 
@@ -136,7 +188,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
   const europeanParams = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    hourly: "temperature_2m",
+    hourly: "temperature_2m,precipitation_probability",
     models: EUROPEAN_MODELS.map((model) => model.modelId).join(","),
     forecast_days: FORECAST_MODE.forecastDays,
     timezone: "auto",
@@ -144,7 +196,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
   const googleParams = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    hourly: "temperature_2m",
+    hourly: "temperature_2m,precipitation_probability",
     models: GOOGLE_MODEL.modelId,
     forecast_days: FORECAST_MODE.forecastDays,
     timezone: "auto",
@@ -190,11 +242,28 @@ async function fetchForecasts(latitude: number, longitude: number) {
       values: forecast.values,
     };
   });
+  const openPrecipitationSeries: Series[] = EUROPEAN_MODELS.map((model) => {
+    const forecast = pickSeries(openMeteo, [
+      `precipitation_probability_${model.modelId}`,
+      "precipitation_probability",
+    ]);
+
+    return {
+      label: model.label,
+      source: `${model.key}-precipitation`,
+      times: forecast.time,
+      values: forecast.values,
+    };
+  });
 
   const deepmind =
     "error" in deepmindResult
       ? null
       : pickSeries(deepmindResult as ForecastJson, GOOGLE_MODEL.fieldCandidates);
+  const googlePrecipitation =
+    "error" in deepmindResult
+      ? null
+      : pickSeries(deepmindResult as ForecastJson, ["precipitation_probability"]);
 
   const allSeries = deepmind
     ? [
@@ -209,10 +278,24 @@ async function fetchForecasts(latitude: number, longitude: number) {
     : openSeries;
 
   let aligned = alignForecasts(allSeries);
+  let precipitationAligned = alignForecasts(
+    googlePrecipitation
+      ? [
+          ...openPrecipitationSeries,
+          {
+            label: GOOGLE_MODEL.label,
+            source: `${GOOGLE_MODEL.key}-precipitation`,
+            times: googlePrecipitation.time,
+            values: googlePrecipitation.values,
+          },
+        ]
+      : openPrecipitationSeries,
+  );
   let warning = deepmind ? "" : "Google 模型離線推論數據未就緒，僅呈現歐洲雙核心";
 
   if (deepmind && aligned.labels.length === 0) {
     aligned = alignForecasts(openSeries);
+    precipitationAligned = alignForecasts(openPrecipitationSeries);
     warning = "Google 模型離線推論數據時間軸未對齊，僅呈現歐洲雙核心";
   }
 
@@ -222,6 +305,11 @@ async function fetchForecasts(latitude: number, longitude: number) {
       ifs: aligned.values[0],
       aifs: aligned.values[1],
       deepmind: aligned.values[2],
+      precipitation: {
+        ifs: precipitationAligned.values[0] ?? [],
+        aifs: precipitationAligned.values[1] ?? [],
+        deepmind: precipitationAligned.values[2],
+      },
     } satisfies AlignedForecast,
     warning,
   };
@@ -315,8 +403,10 @@ function normalizeTaiwanText(value: string) {
 }
 
 export default function Home() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const chartRef = useRef<{ destroy: () => void } | null>(null);
+  const temperatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const precipitationCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const temperatureChartRef = useRef<{ destroy: () => void } | null>(null);
+  const precipitationChartRef = useRef<{ destroy: () => void } | null>(null);
   const [locationQuery, setLocationQuery] = useState("台北市");
   const [places, setPlaces] = useState<Place[]>([]);
   const [geocodeState, setGeocodeState] = useState<GeocodeState>("idle");
@@ -328,6 +418,16 @@ export default function Home() {
   const [warning, setWarning] = useState("");
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<Place>({
+    id: "default-taipei",
+    name: "台北市",
+    county: "台北市",
+    country: "台灣",
+    country_code: "TW",
+    source: "taiwan-town",
+    latitude: DEFAULT_LATITUDE,
+    longitude: DEFAULT_LONGITUDE,
+  });
 
   const pointCount = aligned?.labels.length ?? 0;
   const statusText = useMemo(() => {
@@ -368,6 +468,7 @@ export default function Home() {
     setLatitude(place.latitude.toFixed(5));
     setLongitude(place.longitude.toFixed(5));
     setPlaces([]);
+    setSelectedPlace(place);
     setGeocodeState("idle");
     void synchronize(undefined, place.latitude, place.longitude);
   }
@@ -400,13 +501,13 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!chartReady || !aligned || !canvasRef.current || !window.Chart) {
+    if (!chartReady || !aligned || !temperatureCanvasRef.current || !window.Chart) {
       return;
     }
 
-    chartRef.current?.destroy();
+    temperatureChartRef.current?.destroy();
 
-    chartRef.current = new window.Chart(canvasRef.current, {
+    temperatureChartRef.current = new window.Chart(temperatureCanvasRef.current, {
       type: "line",
       data: {
         labels: aligned.labels.map(formatHourLabel),
@@ -462,8 +563,85 @@ export default function Home() {
       },
     });
 
-    return () => chartRef.current?.destroy();
+    return () => temperatureChartRef.current?.destroy();
   }, [aligned, chartReady]);
+
+  useEffect(() => {
+    if (!chartReady || !aligned || !precipitationCanvasRef.current || !window.Chart) {
+      return;
+    }
+
+    precipitationChartRef.current?.destroy();
+
+    precipitationChartRef.current = new window.Chart(precipitationCanvasRef.current, {
+      type: "line",
+      data: {
+        labels: aligned.labels.map(formatHourLabel),
+        datasets: [
+          {
+            label: `${EUROPEAN_MODELS[0].label} 降雨機率`,
+            data: aligned.precipitation.ifs,
+            ...EUROPEAN_MODELS[0].style,
+          },
+          {
+            label: `${EUROPEAN_MODELS[1].label} 降雨機率`,
+            data: aligned.precipitation.aifs,
+            ...EUROPEAN_MODELS[1].style,
+          },
+          ...(aligned.precipitation.deepmind
+            ? [
+                {
+                  label: `${GOOGLE_MODEL.label} 降雨機率`,
+                  data: aligned.precipitation.deepmind,
+                  ...GOOGLE_MODEL.style,
+                },
+              ]
+            : []),
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: "index" },
+        plugins: {
+          legend: {
+            position: "top",
+            labels: { boxWidth: 24, boxHeight: 3, color: "#334155" },
+          },
+          tooltip: {
+            callbacks: {
+              label: (item: { dataset: { label?: string }; parsed: { y: number } }) =>
+                `${item.dataset.label}: ${item.parsed.y.toFixed(0)}%`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: "#64748b", maxRotation: 0, autoSkipPadding: 28 },
+            grid: { color: "rgba(148, 163, 184, 0.18)" },
+          },
+          y: {
+            min: 0,
+            max: 100,
+            title: { display: true, text: "降雨機率 (%)", color: "#475569" },
+            ticks: { color: "#64748b" },
+            grid: { color: "rgba(148, 163, 184, 0.24)" },
+          },
+        },
+      },
+    });
+
+    return () => precipitationChartRef.current?.destroy();
+  }, [aligned, chartReady]);
+
+  const isTaiwanPlace =
+    selectedPlace.source === "taiwan-town" ||
+    selectedPlace.country_code === "TW" ||
+    selectedPlace.country === "台灣" ||
+    selectedPlace.country === "台湾";
+  const officialService = selectedPlace.country_code
+    ? OFFICIAL_SERVICES[selectedPlace.country_code]
+    : undefined;
 
   return (
     <main className="dashboard-shell">
@@ -576,6 +754,71 @@ export default function Home() {
       {warning ? <div className="warning-banner">{warning}</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
+      <section className="official-section" aria-label="Official weather forecast">
+        <div className="section-title-row">
+          <div>
+            <p className="eyebrow">Official Forecast</p>
+            <h2>{formatPlace(selectedPlace)} 官方氣象預報</h2>
+          </div>
+        </div>
+
+        {isTaiwanPlace ? (
+          <div className="official-grid taiwan">
+            <article className="official-card">
+              <div>
+                <span>中央氣象署</span>
+                <h3>鄉鎮預報</h3>
+              </div>
+              <a href={CWA_TOWN_URL} target="_blank" rel="noreferrer">
+                開啟官方頁
+              </a>
+              <iframe title="中央氣象署鄉鎮預報" src={CWA_TOWN_URL} loading="lazy" />
+            </article>
+            <article className="official-card">
+              <div>
+                <span>中央氣象署</span>
+                <h3>定量降水預報 QPF</h3>
+              </div>
+              <a href={CWA_QPF_URL} target="_blank" rel="noreferrer">
+                開啟官方頁
+              </a>
+              <iframe title="中央氣象署定量降水預報" src={CWA_QPF_URL} loading="lazy" />
+            </article>
+          </div>
+        ) : (
+          <div className="official-grid">
+            <article className="official-card link-only">
+              <div>
+                <span>{officialService?.label || selectedPlace.country || "Global"}</span>
+                <h3>{officialService?.agency || "官方氣象服務入口"}</h3>
+                <p>依所選城市查詢當地官方天氣與降雨預報。</p>
+              </div>
+              <a
+                href={officialService?.forecastUrl || "https://public.wmo.int/en/about-us/members"}
+                target="_blank"
+                rel="noreferrer"
+              >
+                開啟官方預報
+              </a>
+            </article>
+            <article className="official-card link-only">
+              <div>
+                <span>Rain Forecast</span>
+                <h3>官方降雨預報</h3>
+                <p>優先連到該國氣象單位的雷達、QPF 或降雨預報頁。</p>
+              </div>
+              <a
+                href={officialService?.rainUrl || "https://public.wmo.int/en/about-us/members"}
+                target="_blank"
+                rel="noreferrer"
+              >
+                開啟降雨預報
+              </a>
+            </article>
+          </div>
+        )}
+      </section>
+
       <section className="model-registry" aria-label="Model registry">
         <div>
           <span>歐洲模型</span>
@@ -594,7 +837,7 @@ export default function Home() {
       <section className="chart-section" aria-label="Hourly temperature comparison">
         <div className="chart-heading">
           <div>
-            <h2>逐時 2m 氣溫曲線</h2>
+            <h2>三模型逐時比較</h2>
             <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div className="legend-notes">
@@ -611,7 +854,14 @@ export default function Home() {
               <span>正在抓取並對齊三方資料</span>
             </div>
           ) : null}
-          <canvas ref={canvasRef} aria-label="Hourly temperature line chart" />
+          <canvas ref={temperatureCanvasRef} aria-label="Hourly temperature line chart" />
+        </div>
+
+        <div className="chart-subheading">
+          <h3>逐時降雨機率</h3>
+        </div>
+        <div className="chart-frame compact">
+          <canvas ref={precipitationCanvasRef} aria-label="Hourly precipitation probability line chart" />
         </div>
       </section>
     </main>
