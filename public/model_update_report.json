@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-09T01:23:41.065771Z",
+  "generated_at": "2026-09-09T01:38:46.239531Z",
   "auto_adopt_compatible": true,
-  "registry_updated": true,
+  "registry_updated": false,
   "open_meteo": {
     "docs_url": "https://open-meteo.com/en/docs",
     "discovered_ecmwf_models": [
@@ -15,6 +15,7 @@
         "key": "ifs",
         "label": "ECMWF IFS 物理",
         "current_model_id": "ecmwf_ifs025",
+        "endpoint": "https://api.open-meteo.com/v1/forecast",
         "compatible_models": [
           "ecmwf_ifs",
           "ecmwf_ifs025"
@@ -43,13 +44,14 @@
       {
         "key": "aifs",
         "label": "ECMWF AIFS 歐洲 AI",
-        "current_model_id": "ecmwf_aifs025",
+        "current_model_id": "ecmwf_aifs025_single",
+        "endpoint": "https://api.open-meteo.com/v1/forecast",
         "compatible_models": [
           "ecmwf_aifs025",
           "ecmwf_aifs025_single"
         ],
         "selected_model_id": "ecmwf_aifs025_single",
-        "would_update": true,
+        "would_update": false,
         "probe_results": [
           {
             "model_id": "ecmwf_aifs025",
@@ -72,10 +74,116 @@
     ]
   },
   "google_weather": {
-    "docs_url": "https://developers.google.com/weathernext/guides/osmodel",
+    "open_meteo_docs_url": "https://open-meteo.com/en/docs/google-weathernext-api",
+    "open_source_docs_url": "https://developers.google.com/weathernext/guides/osmodel",
     "github_repo": "google-deepmind/weathernext",
-    "auto_adopt": false,
-    "reason": "WeatherNext service models and open-source checkpoints need explicit data access, weights, and adapter validation before production use.",
+    "api_slot": {
+      "key": "google",
+      "label": "Google WeatherNext",
+      "endpoint": "https://ensemble-api.open-meteo.com/v1/ensemble",
+      "current_model_id": "google_weathernext2_ensemble_mean",
+      "auto_adopt": true,
+      "allowed_model_pattern": "^google_weathernext"
+    },
+    "auto_adopt_open_source": false,
+    "reason": "Open-Meteo WeatherNext API ids can be probed and adopted when compatible. Open-source checkpoints still need explicit data access, weights, and adapter validation before production use.",
+    "discovered_api_models": [
+      "google_weathernext2_ensemble",
+      "google_weathernext2_ensemble_mean"
+    ],
+    "api_check": {
+      "key": "google",
+      "label": "Google WeatherNext",
+      "current_model_id": "google_weathernext2_ensemble_mean",
+      "endpoint": "https://ensemble-api.open-meteo.com/v1/ensemble",
+      "compatible_models": [
+        "google_weathernext2_ensemble",
+        "google_weathernext2_ensemble_mean"
+      ],
+      "selected_model_id": "google_weathernext2_ensemble_mean",
+      "would_update": false,
+      "probe_results": [
+        {
+          "model_id": "google_weathernext2_ensemble",
+          "ok": true,
+          "field_names": [
+            "temperature_2m",
+            "temperature_2m_member01",
+            "temperature_2m_member02",
+            "temperature_2m_member03",
+            "temperature_2m_member04",
+            "temperature_2m_member05",
+            "temperature_2m_member06",
+            "temperature_2m_member07",
+            "temperature_2m_member08",
+            "temperature_2m_member09",
+            "temperature_2m_member10",
+            "temperature_2m_member11",
+            "temperature_2m_member12",
+            "temperature_2m_member13",
+            "temperature_2m_member14",
+            "temperature_2m_member15",
+            "temperature_2m_member16",
+            "temperature_2m_member17",
+            "temperature_2m_member18",
+            "temperature_2m_member19",
+            "temperature_2m_member20",
+            "temperature_2m_member21",
+            "temperature_2m_member22",
+            "temperature_2m_member23",
+            "temperature_2m_member24",
+            "temperature_2m_member25",
+            "temperature_2m_member26",
+            "temperature_2m_member27",
+            "temperature_2m_member28",
+            "temperature_2m_member29",
+            "temperature_2m_member30",
+            "temperature_2m_member31",
+            "temperature_2m_member32",
+            "temperature_2m_member33",
+            "temperature_2m_member34",
+            "temperature_2m_member35",
+            "temperature_2m_member36",
+            "temperature_2m_member37",
+            "temperature_2m_member38",
+            "temperature_2m_member39",
+            "temperature_2m_member40",
+            "temperature_2m_member41",
+            "temperature_2m_member42",
+            "temperature_2m_member43",
+            "temperature_2m_member44",
+            "temperature_2m_member45",
+            "temperature_2m_member46",
+            "temperature_2m_member47",
+            "temperature_2m_member48",
+            "temperature_2m_member49",
+            "temperature_2m_member50",
+            "temperature_2m_member51",
+            "temperature_2m_member52",
+            "temperature_2m_member53",
+            "temperature_2m_member54",
+            "temperature_2m_member55",
+            "temperature_2m_member56",
+            "temperature_2m_member57",
+            "temperature_2m_member58",
+            "temperature_2m_member59",
+            "temperature_2m_member60",
+            "temperature_2m_member61",
+            "temperature_2m_member62",
+            "temperature_2m_member63"
+          ],
+          "timesteps": 24
+        },
+        {
+          "model_id": "google_weathernext2_ensemble_mean",
+          "ok": true,
+          "field_names": [
+            "temperature_2m"
+          ],
+          "timesteps": 24
+        }
+      ]
+    },
     "latest_open_source_release": {
       "repo": "google-deepmind/weathernext",
       "ok": true,

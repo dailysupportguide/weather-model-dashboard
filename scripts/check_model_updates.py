@@ -1,9 +1,9 @@
 """Check official model sources and optionally adopt compatible updates.
 
-The script is conservative by design. Open-Meteo model ids can be auto-adopted
-only when they match an allowed family and a live API probe returns hourly 2m
-temperature fields. Google WeatherNext releases are reported because service
-access, model weights, and adapter code must be validated before switching.
+The script is conservative by design. API model ids can be auto-adopted only
+when they match an allowed family and a live API probe returns hourly 2m
+temperature fields. Google open-source releases are reported because weights,
+input data, and adapter code must be validated before switching.
 """
 
 from __future__ import annotations
@@ -43,9 +43,9 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def discover_open_meteo_models(docs_url: str) -> list[str]:
+def discover_models(docs_url: str, prefix: str) -> list[str]:
     text = fetch_text(docs_url)
-    raw_models = re.findall(r"\becmwf_[a-z0-9_]+\b", text, flags=re.IGNORECASE)
+    raw_models = re.findall(rf"\b{re.escape(prefix)}[a-z0-9_]+\b", text, flags=re.IGNORECASE)
     models = set()
 
     for model in raw_models:
@@ -59,7 +59,11 @@ def discover_open_meteo_models(docs_url: str) -> list[str]:
     return sorted(model.lower() for model in models)
 
 
-def probe_open_meteo_model(model_id: str, probe: dict[str, Any]) -> dict[str, Any]:
+def probe_api_model(
+    model_id: str,
+    probe: dict[str, Any],
+    endpoint: str = OPEN_METEO_FORECAST_URL,
+) -> dict[str, Any]:
     params = {
         "latitude": probe["latitude"],
         "longitude": probe["longitude"],
@@ -68,7 +72,7 @@ def probe_open_meteo_model(model_id: str, probe: dict[str, Any]) -> dict[str, An
         "models": model_id,
         "timezone": "auto",
     }
-    url = f"{OPEN_METEO_FORECAST_URL}?{urllib.parse.urlencode(params)}"
+    url = f"{endpoint}?{urllib.parse.urlencode(params)}"
 
     try:
         payload = json.loads(fetch_text(url))
@@ -92,6 +96,7 @@ def choose_latest_compatible(
     discovered: list[str],
     slot: dict[str, Any],
     probe: dict[str, Any],
+    endpoint: str = OPEN_METEO_FORECAST_URL,
 ) -> dict[str, Any]:
     pattern = re.compile(slot["allowed_model_pattern"])
     candidates = [model for model in discovered if pattern.search(model)]
@@ -100,7 +105,10 @@ def choose_latest_compatible(
     if current not in candidates:
         candidates.append(current)
 
-    probed = [probe_open_meteo_model(model, probe) for model in sorted(set(candidates))]
+    probed = [
+        probe_api_model(model, probe, endpoint)
+        for model in sorted(set(candidates))
+    ]
     compatible = [item["model_id"] for item in probed if item.get("ok")]
     selected = sorted(compatible)[-1] if compatible else current
 
@@ -108,6 +116,7 @@ def choose_latest_compatible(
         "key": slot["key"],
         "label": slot["label"],
         "current_model_id": current,
+        "endpoint": endpoint,
         "compatible_models": compatible,
         "selected_model_id": selected,
         "would_update": selected != current,
@@ -144,8 +153,8 @@ def update_registry(open_meteo_checks: list[dict[str, Any]]) -> bool:
             f'modelId: "{check["selected_model_id"]}"',
         )
         updated = updated.replace(
-            f'temperature_2m_{check["current_model_id"]}',
-            f'temperature_2m_{check["selected_model_id"]}',
+            f'"temperature_2m_{check["current_model_id"]}"',
+            f'"temperature_2m_{check["selected_model_id"]}"',
         )
 
     if updated == text:
@@ -165,14 +174,26 @@ def main() -> None:
     args = parser.parse_args()
 
     policy = load_json(POLICY_PATH)
-    discovered = discover_open_meteo_models(policy["open_meteo"]["docs_url"])
+    discovered = discover_models(policy["open_meteo"]["docs_url"], "ecmwf_")
     open_meteo_checks = [
         choose_latest_compatible(discovered, slot, policy["open_meteo"]["probe"])
         for slot in policy["open_meteo"]["slots"]
     ]
+    google_api_models = discover_models(
+        policy["google_weather"]["open_meteo_docs_url"],
+        "google_weathernext",
+    )
+    google_api_check = choose_latest_compatible(
+        google_api_models,
+        policy["google_weather"]["api_slot"],
+        policy["open_meteo"]["probe"],
+        policy["google_weather"]["api_slot"]["endpoint"],
+    )
     google_release = get_latest_github_release(policy["google_weather"]["github_repo"])
     registry_updated = (
-        update_registry(open_meteo_checks) if args.auto_adopt_compatible else False
+        update_registry([*open_meteo_checks, google_api_check])
+        if args.auto_adopt_compatible
+        else False
     )
 
     report = {
@@ -186,6 +207,8 @@ def main() -> None:
         },
         "google_weather": {
             **policy["google_weather"],
+            "discovered_api_models": google_api_models,
+            "api_check": google_api_check,
             "latest_open_source_release": google_release,
             "requires_manual_adapter_validation": True,
         },

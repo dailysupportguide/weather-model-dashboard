@@ -119,7 +119,7 @@ function alignForecasts(series: Series[]) {
 }
 
 async function fetchForecasts(latitude: number, longitude: number) {
-  const params = new URLSearchParams({
+  const europeanParams = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
     hourly: "temperature_2m",
@@ -127,15 +127,34 @@ async function fetchForecasts(latitude: number, longitude: number) {
     forecast_days: FORECAST_MODE.forecastDays,
     timezone: "auto",
   });
+  const googleParams = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    hourly: "temperature_2m",
+    models: GOOGLE_MODEL.modelId,
+    forecast_days: FORECAST_MODE.forecastDays,
+    timezone: "auto",
+  });
 
   const [openMeteoResult, deepmindResult] = await Promise.all([
-    fetch(`${OPEN_METEO_URL}?${params.toString()}`),
-    fetch(`${GOOGLE_MODEL.dataUrl}?ts=${Date.now()}`).then(async (response) => {
-      if (!response.ok) {
-        throw new Error("Google model forecast file is not available.");
-      }
-      return (await response.json()) as ForecastJson;
-    }),
+    fetch(`${OPEN_METEO_URL}?${europeanParams.toString()}`),
+    fetch(`${GOOGLE_MODEL.endpoint}?${googleParams.toString()}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Google WeatherNext API is not available.");
+        }
+        return (await response.json()) as ForecastJson;
+      })
+      .catch(() =>
+        fetch(`${GOOGLE_MODEL.fallbackDataUrl}?ts=${Date.now()}`).then(
+          async (response) => {
+            if (!response.ok) {
+              throw new Error("Google model forecast file is not available.");
+            }
+            return (await response.json()) as ForecastJson;
+          },
+        ),
+      ),
   ].map((promise) => promise.catch((error) => ({ error }))));
 
   if ("error" in openMeteoResult) {

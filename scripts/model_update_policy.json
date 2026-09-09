@@ -18,16 +18,25 @@
       {
         "key": "aifs",
         "label": "ECMWF AIFS 歐洲 AI",
-        "current_model_id": "ecmwf_aifs025",
+        "current_model_id": "ecmwf_aifs025_single",
         "auto_adopt": true,
         "allowed_model_pattern": "^ecmwf_aifs"
       }
     ]
   },
   "google_weather": {
-    "docs_url": "https://developers.google.com/weathernext/guides/osmodel",
+    "open_meteo_docs_url": "https://open-meteo.com/en/docs/google-weathernext-api",
+    "open_source_docs_url": "https://developers.google.com/weathernext/guides/osmodel",
     "github_repo": "google-deepmind/weathernext",
-    "auto_adopt": false,
-    "reason": "WeatherNext service models and open-source checkpoints need explicit data access, weights, and adapter validation before production use."
+    "api_slot": {
+      "key": "google",
+      "label": "Google WeatherNext",
+      "endpoint": "https://ensemble-api.open-meteo.com/v1/ensemble",
+      "current_model_id": "google_weathernext2_ensemble_mean",
+      "auto_adopt": true,
+      "allowed_model_pattern": "^google_weathernext"
+    },
+    "auto_adopt_open_source": false,
+    "reason": "Open-Meteo WeatherNext API ids can be probed and adopted when compatible. Open-source checkpoints still need explicit data access, weights, and adapter validation before production use."
   }
 }

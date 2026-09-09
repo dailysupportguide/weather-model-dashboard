@@ -39,9 +39,11 @@ export const EUROPEAN_MODELS = [
 
 export const GOOGLE_MODEL = {
   key: "google",
-  label: "Google WeatherNext / GraphCast",
-  provider: "Self-hosted Colab or authorized Google source",
-  dataUrl: "/deepmind_forecast.json",
+  label: "Google WeatherNext 2",
+  provider: "Open-Meteo Google WeatherNext 2 API",
+  endpoint: "https://ensemble-api.open-meteo.com/v1/ensemble",
+  modelId: "google_weathernext2_ensemble_mean",
+  fallbackDataUrl: "/deepmind_forecast.json",
   fieldCandidates: ["temperature_2m"],
   style: {
     borderColor: "#16a34a",
@@ -55,6 +57,6 @@ export const GOOGLE_MODEL = {
 
 export const UPGRADE_POLICY = [
   "歐洲模型：更新 Open-Meteo modelId 與 fieldCandidates 即可切換新版本。",
-  "Google 模型：更新 dataUrl 或 Colab adapter，可切換 WeatherNext / GraphCast 新資料源。",
+  "Google 模型：優先檢查 Open-Meteo WeatherNext API；Colab adapter 作為自建推論備援。",
   "圖表對齊：永遠以啟用模型的共同時間戳交集顯示，避免新舊模型預報長度不同。",
 ];
