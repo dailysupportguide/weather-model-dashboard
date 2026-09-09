@@ -26,6 +26,7 @@ type Series = {
   source: string;
   times: string[];
   values: Array<number | null>;
+  derived?: boolean;
 };
 
 type AlignedForecast = {
@@ -37,6 +38,11 @@ type AlignedForecast = {
     ifs: Array<number | null>;
     aifs: Array<number | null>;
     deepmind?: Array<number | null>;
+  };
+  precipitationLabels: {
+    ifs: string;
+    aifs: string;
+    deepmind: string;
   };
 };
 
@@ -161,6 +167,39 @@ function pickSeries(data: ForecastJson, fieldCandidates: readonly string[]) {
   };
 }
 
+function fetchWithTimeout(url: string, timeoutMs = 6000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => window.clearTimeout(timer));
+}
+
+function hasUsableValues(values: Array<number | null>) {
+  return values.some((value) => value !== null && Number.isFinite(value));
+}
+
+function precipitationToRainRisk(values: Array<number | null>) {
+  return values.map((value) => {
+    if (value === null || !Number.isFinite(value)) {
+      return null;
+    }
+    return Math.round(100 * (1 - Math.exp(-Number(value) * 1.25)));
+  });
+}
+
+function pickRainSeries(data: ForecastJson, probabilityFields: readonly string[], amountFields: readonly string[]) {
+  const probability = pickSeries(data, probabilityFields);
+  if (hasUsableValues(probability.values)) {
+    return { ...probability, derived: false };
+  }
+
+  const amount = pickSeries(data, amountFields);
+  return {
+    time: amount.time,
+    values: precipitationToRainRisk(amount.values),
+    derived: true,
+  };
+}
+
 function seriesToMap(series: Series) {
   const map = new Map<string, number | null>();
   series.times.forEach((time, index) => {
@@ -188,7 +227,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
   const europeanParams = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    hourly: "temperature_2m,precipitation_probability",
+    hourly: "temperature_2m,precipitation_probability,precipitation",
     models: EUROPEAN_MODELS.map((model) => model.modelId).join(","),
     forecast_days: FORECAST_MODE.forecastDays,
     timezone: "auto",
@@ -196,7 +235,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
   const googleParams = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    hourly: "temperature_2m,precipitation_probability",
+    hourly: "temperature_2m,precipitation_probability,precipitation",
     models: GOOGLE_MODEL.modelId,
     forecast_days: FORECAST_MODE.forecastDays,
     timezone: "auto",
@@ -204,7 +243,7 @@ async function fetchForecasts(latitude: number, longitude: number) {
 
   const [openMeteoResult, deepmindResult] = await Promise.all([
     fetch(`${OPEN_METEO_URL}?${europeanParams.toString()}`),
-    fetch(`${GOOGLE_MODEL.endpoint}?${googleParams.toString()}`)
+    fetchWithTimeout(`${GOOGLE_MODEL.endpoint}?${googleParams.toString()}`)
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Google WeatherNext API is not available.");
@@ -243,16 +282,21 @@ async function fetchForecasts(latitude: number, longitude: number) {
     };
   });
   const openPrecipitationSeries: Series[] = EUROPEAN_MODELS.map((model) => {
-    const forecast = pickSeries(openMeteo, [
+    const forecast = pickRainSeries(
+      openMeteo,
+      [
       `precipitation_probability_${model.modelId}`,
       "precipitation_probability",
-    ]);
+      ],
+      [`precipitation_${model.modelId}`, "precipitation"],
+    );
 
     return {
-      label: model.label,
+      label: `${model.label}${forecast.derived ? " 降雨風險" : " 降雨機率"}`,
       source: `${model.key}-precipitation`,
       times: forecast.time,
       values: forecast.values,
+      derived: forecast.derived,
     };
   });
 
@@ -263,7 +307,11 @@ async function fetchForecasts(latitude: number, longitude: number) {
   const googlePrecipitation =
     "error" in deepmindResult
       ? null
-      : pickSeries(deepmindResult as ForecastJson, ["precipitation_probability"]);
+      : pickRainSeries(
+          deepmindResult as ForecastJson,
+          ["precipitation_probability"],
+          ["precipitation"],
+        );
 
   const allSeries = deepmind
     ? [
@@ -278,19 +326,21 @@ async function fetchForecasts(latitude: number, longitude: number) {
     : openSeries;
 
   let aligned = alignForecasts(allSeries);
-  let precipitationAligned = alignForecasts(
-    googlePrecipitation
-      ? [
-          ...openPrecipitationSeries,
-          {
-            label: GOOGLE_MODEL.label,
-            source: `${GOOGLE_MODEL.key}-precipitation`,
-            times: googlePrecipitation.time,
-            values: googlePrecipitation.values,
-          },
-        ]
-      : openPrecipitationSeries,
-  );
+  const precipitationSeries = googlePrecipitation
+    ? [
+        ...openPrecipitationSeries,
+        {
+          label: `${GOOGLE_MODEL.label}${
+            googlePrecipitation.derived ? " 降雨風險" : " 降雨機率"
+          }`,
+          source: `${GOOGLE_MODEL.key}-precipitation`,
+          times: googlePrecipitation.time,
+          values: googlePrecipitation.values,
+          derived: googlePrecipitation.derived,
+        },
+      ]
+    : openPrecipitationSeries;
+  let precipitationAligned = alignForecasts(precipitationSeries);
   let warning = deepmind ? "" : "Google 模型離線推論數據未就緒，僅呈現歐洲雙核心";
 
   if (deepmind && aligned.labels.length === 0) {
@@ -309,6 +359,11 @@ async function fetchForecasts(latitude: number, longitude: number) {
         ifs: precipitationAligned.values[0] ?? [],
         aifs: precipitationAligned.values[1] ?? [],
         deepmind: precipitationAligned.values[2],
+      },
+      precipitationLabels: {
+        ifs: precipitationSeries[0]?.label ?? `${EUROPEAN_MODELS[0].label} 降雨機率`,
+        aifs: precipitationSeries[1]?.label ?? `${EUROPEAN_MODELS[1].label} 降雨機率`,
+        deepmind: precipitationSeries[2]?.label ?? `${GOOGLE_MODEL.label} 降雨機率`,
       },
     } satisfies AlignedForecast,
     warning,
@@ -418,6 +473,7 @@ export default function Home() {
   const [warning, setWarning] = useState("");
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState("");
+  const [cwaFramesReady, setCwaFramesReady] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place>({
     id: "default-taipei",
     name: "台北市",
@@ -469,6 +525,7 @@ export default function Home() {
     setLongitude(place.longitude.toFixed(5));
     setPlaces([]);
     setSelectedPlace(place);
+    setCwaFramesReady(false);
     setGeocodeState("idle");
     void synchronize(undefined, place.latitude, place.longitude);
   }
@@ -579,19 +636,19 @@ export default function Home() {
         labels: aligned.labels.map(formatHourLabel),
         datasets: [
           {
-            label: `${EUROPEAN_MODELS[0].label} 降雨機率`,
+            label: aligned.precipitationLabels.ifs,
             data: aligned.precipitation.ifs,
             ...EUROPEAN_MODELS[0].style,
           },
           {
-            label: `${EUROPEAN_MODELS[1].label} 降雨機率`,
+            label: aligned.precipitationLabels.aifs,
             data: aligned.precipitation.aifs,
             ...EUROPEAN_MODELS[1].style,
           },
           ...(aligned.precipitation.deepmind
             ? [
                 {
-                  label: `${GOOGLE_MODEL.label} 降雨機率`,
+                  label: aligned.precipitationLabels.deepmind,
                   data: aligned.precipitation.deepmind,
                   ...GOOGLE_MODEL.style,
                 },
@@ -623,7 +680,7 @@ export default function Home() {
           y: {
             min: 0,
             max: 100,
-            title: { display: true, text: "降雨機率 (%)", color: "#475569" },
+            title: { display: true, text: "降雨機率 / 風險 (%)", color: "#475569" },
             ticks: { color: "#64748b" },
             grid: { color: "rgba(148, 163, 184, 0.24)" },
           },
@@ -642,6 +699,15 @@ export default function Home() {
   const officialService = selectedPlace.country_code
     ? OFFICIAL_SERVICES[selectedPlace.country_code]
     : undefined;
+
+  useEffect(() => {
+    if (!isTaiwanPlace) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setCwaFramesReady(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, [isTaiwanPlace, selectedPlace.id]);
 
   return (
     <main className="dashboard-shell">
@@ -772,7 +838,11 @@ export default function Home() {
               <a href={CWA_TOWN_URL} target="_blank" rel="noreferrer">
                 開啟官方頁
               </a>
-              <iframe title="中央氣象署鄉鎮預報" src={CWA_TOWN_URL} loading="lazy" />
+              <iframe
+                title="中央氣象署鄉鎮預報"
+                src={cwaFramesReady ? CWA_TOWN_URL : undefined}
+                loading="lazy"
+              />
             </article>
             <article className="official-card">
               <div>
@@ -782,7 +852,11 @@ export default function Home() {
               <a href={CWA_QPF_URL} target="_blank" rel="noreferrer">
                 開啟官方頁
               </a>
-              <iframe title="中央氣象署定量降水預報" src={CWA_QPF_URL} loading="lazy" />
+              <iframe
+                title="中央氣象署定量降水預報"
+                src={cwaFramesReady ? CWA_QPF_URL : undefined}
+                loading="lazy"
+              />
             </article>
           </div>
         ) : (
@@ -858,7 +932,7 @@ export default function Home() {
         </div>
 
         <div className="chart-subheading">
-          <h3>逐時降雨機率</h3>
+          <h3>逐時降雨機率 / 風險</h3>
         </div>
         <div className="chart-frame compact">
           <canvas ref={precipitationCanvasRef} aria-label="Hourly precipitation probability line chart" />
