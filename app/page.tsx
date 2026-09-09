@@ -39,18 +39,29 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 type GeocodeState = "idle" | "searching" | "ready" | "error";
 
 type Place = {
-  id: number;
+  id: number | string;
   name: string;
   latitude: number;
   longitude: number;
   country?: string;
+  country_code?: string;
   admin1?: string;
   admin2?: string;
   timezone?: string;
+  county?: string;
+  source?: "taiwan-town" | "global-city";
 };
 
 type GeocodingJson = {
   results?: Place[];
+};
+
+type TaiwanTown = {
+  id: string;
+  name: string;
+  county: string;
+  latitude: number;
+  longitude: number;
 };
 
 declare global {
@@ -65,6 +76,9 @@ const DEFAULT_LATITUDE = 25.03;
 const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
+const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
+
+let taiwanTownCache: TaiwanTown[] | null = null;
 
 function formatHourLabel(value: string) {
   const parsed = new Date(value);
@@ -214,9 +228,10 @@ async function fetchForecasts(latitude: number, longitude: number) {
 }
 
 async function searchPlaces(query: string) {
+  const taiwanMatches = await searchTaiwanTowns(query);
   const params = new URLSearchParams({
     name: query,
-    count: "5",
+    count: taiwanMatches.length ? "6" : "8",
     language: "zh",
     format: "json",
   });
@@ -227,13 +242,65 @@ async function searchPlaces(query: string) {
   }
 
   const data = (await response.json()) as GeocodingJson;
-  return data.results ?? [];
+  const globalResults = (data.results ?? [])
+    .filter((place) => place.country_code !== "TW")
+    .slice(0, taiwanMatches.length ? 3 : 6)
+    .map((place) => ({ ...place, source: "global-city" as const }));
+
+  return [...taiwanMatches, ...globalResults];
+}
+
+async function searchTaiwanTowns(query: string) {
+  const normalizedQuery = normalizeTaiwanText(query);
+  const shouldPreferTaiwan =
+    /[\u4e00-\u9fff]/.test(query) ||
+    /taiwan|tw|taipei|taichung|tainan|kaohsiung|hsinchu|keelung|chiayi|miaoli|changhua|nantou|yunlin|pingtung|yilan|hualien|taitung|penghu|kinmen|lienchiang/i.test(
+      query,
+    );
+
+  if (!shouldPreferTaiwan) {
+    return [];
+  }
+
+  if (!taiwanTownCache) {
+    const response = await fetch(`${TAIWAN_TOWNS_URL}?ts=20260909`);
+    if (!response.ok) {
+      return [];
+    }
+    taiwanTownCache = (await response.json()) as TaiwanTown[];
+  }
+
+  return taiwanTownCache
+    .filter((town) =>
+      normalizeTaiwanText(`${town.county}${town.name}`).includes(normalizedQuery) ||
+      normalizeTaiwanText(town.name).includes(normalizedQuery) ||
+      normalizeTaiwanText(town.county).includes(normalizedQuery),
+    )
+    .slice(0, 6)
+    .map((town) => ({
+      id: town.id,
+      name: town.name,
+      county: town.county,
+      admin1: town.county,
+      country: "台灣",
+      latitude: town.latitude,
+      longitude: town.longitude,
+      source: "taiwan-town" as const,
+    }));
 }
 
 function formatPlace(place: Place) {
-  return [place.name, place.admin2, place.admin1, place.country]
+  return [place.name, place.county || place.admin2, place.admin1, place.country]
     .filter(Boolean)
     .join(" · ");
+}
+
+function normalizeTaiwanText(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replaceAll("臺", "台")
+    .replace(/\s+/g, "");
 }
 
 export default function Home() {
@@ -403,8 +470,7 @@ export default function Home() {
           <p className="eyebrow">Global Model Comparison</p>
           <h1>全球三核心氣象模型預測對比儀表板</h1>
           <p className="lead">
-            以未來 48 小時逐時氣溫作為三方模型交集窗口，將 ECMWF IFS、
-            ECMWF AIFS 與 Google WeatherNext / GraphCast 對齊到同一條時間軸。
+            輸入地點即可同步三大模型；台灣支援鄉鎮市區，其他地區以城市搜尋。
           </p>
         </div>
 
@@ -421,7 +487,7 @@ export default function Home() {
             <input
               value={locationQuery}
               onChange={(event) => setLocationQuery(event.target.value)}
-              placeholder="輸入城市、地標或行政區"
+              placeholder="台灣可輸入鄉鎮市區，國外輸入城市"
               aria-label="Location"
             />
           </label>
@@ -439,7 +505,16 @@ export default function Home() {
                   title={`${place.latitude}, ${place.longitude}`}
                 >
                   <strong>{place.name}</strong>
-                  <span>{[place.admin2, place.admin1, place.country].filter(Boolean).join(" · ")}</span>
+                  <span>
+                    {[
+                      place.source === "taiwan-town" ? "鄉鎮市區" : "城市",
+                      place.county || place.admin2,
+                      place.admin1,
+                      place.country,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </button>
               ))}
             </div>
@@ -509,7 +584,7 @@ export default function Home() {
         <div className="chart-heading">
           <div>
             <h2>逐時 2m 氣溫曲線</h2>
-            <p>三條曲線只顯示共同存在的時間點，避免模型預報長度不同造成誤判。</p>
+            <p>僅顯示三方共同時間點，手機上可橫向滑動查看細節。</p>
           </div>
           <div className="legend-notes">
             <span className="ifs">IFS</span>
