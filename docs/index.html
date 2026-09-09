@@ -723,7 +723,7 @@
           <canvas id="forecastChart" aria-label="Hourly temperature line chart"></canvas>
         </div>
         <div class="chart-subheading">
-          <h3>逐時降雨機率</h3>
+          <h3>逐時降雨機率 / 風險</h3>
         </div>
         <div class="chart-frame compact">
           <canvas id="precipitationChart" aria-label="Hourly precipitation probability line chart"></canvas>
@@ -875,6 +875,31 @@
         return { time, values: field ? hourly[field] : [] };
       }
 
+      function hasUsableValues(values) {
+        return values.some((value) => value !== null && Number.isFinite(value));
+      }
+
+      function precipitationToRainRisk(values) {
+        return values.map((value) => {
+          if (value === null || !Number.isFinite(value)) return null;
+          return Math.round(100 * (1 - Math.exp(-Number(value) * 1.25)));
+        });
+      }
+
+      function pickRainSeries(data, probabilityFields, amountFields) {
+        const probability = pickSeries(data, probabilityFields);
+        if (hasUsableValues(probability.values)) {
+          return { ...probability, derived: false };
+        }
+
+        const amount = pickSeries(data, amountFields);
+        return {
+          time: amount.time,
+          values: precipitationToRainRisk(amount.values),
+          derived: true,
+        };
+      }
+
       function seriesToMap(series) {
         const map = new Map();
         series.times.forEach((time, index) => map.set(time, series.values[index] ?? null));
@@ -906,6 +931,18 @@
         const response = await fetch(url);
         if (!response.ok) throw new Error(`${url} failed: ${response.status}`);
         return response.json();
+      }
+
+      async function fetchJsonWithTimeout(url, timeoutMs = 6000) {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          if (!response.ok) throw new Error(`${url} failed: ${response.status}`);
+          return response.json();
+        } finally {
+          window.clearTimeout(timer);
+        }
       }
 
       function normalizeTaiwanText(value) {
@@ -949,7 +986,7 @@
                   <h3>鄉鎮預報</h3>
                 </div>
                 <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟官方頁</a>
-                <iframe title="中央氣象署鄉鎮預報" src="${cwaTownUrl}" loading="lazy"></iframe>
+                <iframe title="中央氣象署鄉鎮預報" data-src="${cwaTownUrl}" loading="lazy"></iframe>
               </article>
               <article class="official-card">
                 <div>
@@ -957,7 +994,7 @@
                   <h3>定量降水預報 QPF</h3>
                 </div>
                 <a href="${cwaQpfUrl}" target="_blank" rel="noreferrer">開啟官方頁</a>
-                <iframe title="中央氣象署定量降水預報" src="${cwaQpfUrl}" loading="lazy"></iframe>
+                <iframe title="中央氣象署定量降水預報" data-src="${cwaQpfUrl}" loading="lazy"></iframe>
               </article>
             </div>
           `;
@@ -986,6 +1023,16 @@
             </article>
           </div>
         `;
+      }
+
+      function loadOfficialFramesSoon() {
+        window.setTimeout(() => {
+          document.querySelectorAll("iframe[data-src]").forEach((frame) => {
+            if (!frame.getAttribute("src")) {
+              frame.setAttribute("src", frame.getAttribute("data-src"));
+            }
+          });
+        }, 1500);
       }
 
       async function searchTaiwanTowns(query) {
@@ -1049,7 +1096,7 @@
         const europeanParams = new URLSearchParams({
           latitude,
           longitude,
-          hourly: "temperature_2m,precipitation_probability",
+          hourly: "temperature_2m,precipitation_probability,precipitation",
           models: europeanModels.map((model) => model.modelId).join(","),
           forecast_days: forecastMode.forecastDays,
           timezone: "auto",
@@ -1057,7 +1104,7 @@
         const googleParams = new URLSearchParams({
           latitude,
           longitude,
-          hourly: "temperature_2m,precipitation_probability",
+          hourly: "temperature_2m,precipitation_probability,precipitation",
           models: googleModel.modelId,
           forecast_days: forecastMode.forecastDays,
           timezone: "auto",
@@ -1065,7 +1112,7 @@
 
         const [europeanData, googleData] = await Promise.all([
           fetchJson(`https://api.open-meteo.com/v1/forecast?${europeanParams.toString()}`),
-          fetchJson(`${googleModel.endpoint}?${googleParams.toString()}`).catch(() =>
+          fetchJsonWithTimeout(`${googleModel.endpoint}?${googleParams.toString()}`).catch(() =>
             fetchJson(`${googleModel.fallbackDataUrl}?ts=${Date.now()}`),
           ),
         ]);
@@ -1080,19 +1127,25 @@
           };
         });
         const europeanPrecipitationSeries = europeanModels.map((model) => {
-          const forecast = pickSeries(europeanData, [
-            `precipitation_probability_${model.modelId}`,
-            "precipitation_probability",
-          ]);
+          const forecast = pickRainSeries(
+            europeanData,
+            [`precipitation_probability_${model.modelId}`, "precipitation_probability"],
+            [`precipitation_${model.modelId}`, "precipitation"],
+          );
           return {
-            label: model.label,
+            label: `${model.label}${forecast.derived ? " 降雨風險" : " 降雨機率"}`,
             source: `${model.key}-precipitation`,
             times: forecast.time,
             values: forecast.values,
+            derived: forecast.derived,
           };
         });
         const googleForecast = pickSeries(googleData, googleModel.fieldCandidates);
-        const googlePrecipitation = pickSeries(googleData, ["precipitation_probability"]);
+        const googlePrecipitation = pickRainSeries(
+          googleData,
+          ["precipitation_probability"],
+          ["precipitation"],
+        );
         const allSeries = [
           ...europeanSeries,
           {
@@ -1125,6 +1178,11 @@
                 ifs: europeanPrecipitationOnly.values[0] || [],
                 aifs: europeanPrecipitationOnly.values[1] || [],
               },
+              precipitationLabels: {
+                ifs: europeanPrecipitationSeries[0]?.label || `${europeanModels[0].label} 降雨機率`,
+                aifs: europeanPrecipitationSeries[1]?.label || `${europeanModels[1].label} 降雨機率`,
+                google: `${googleModel.label} 降雨機率`,
+              },
             },
             warning: "Google 模型資料時間軸未對齊，僅呈現歐洲雙核心",
           };
@@ -1140,6 +1198,11 @@
               ifs: precipitationAligned.values[0] || [],
               aifs: precipitationAligned.values[1] || [],
               google: precipitationAligned.values[2],
+            },
+            precipitationLabels: {
+              ifs: europeanPrecipitationSeries[0]?.label || `${europeanModels[0].label} 降雨機率`,
+              aifs: europeanPrecipitationSeries[1]?.label || `${europeanModels[1].label} 降雨機率`,
+              google: `${googleModel.label}${googlePrecipitation.derived ? " 降雨風險" : " 降雨機率"}`,
             },
           },
           warning: "",
@@ -1188,19 +1251,19 @@
         if (state.precipitationChart) state.precipitationChart.destroy();
         const precipitationDatasets = [
           {
-            label: `${europeanModels[0].label} 降雨機率`,
+            label: aligned.precipitationLabels.ifs,
             data: aligned.precipitation.ifs,
             ...europeanModels[0].style,
           },
           {
-            label: `${europeanModels[1].label} 降雨機率`,
+            label: aligned.precipitationLabels.aifs,
             data: aligned.precipitation.aifs,
             ...europeanModels[1].style,
           },
         ];
         if (aligned.precipitation.google) {
           precipitationDatasets.push({
-            label: `${googleModel.label} 降雨機率`,
+            label: aligned.precipitationLabels.google,
             data: aligned.precipitation.google,
             ...googleModel.style,
           });
@@ -1229,7 +1292,7 @@
               y: {
                 min: 0,
                 max: 100,
-                title: { display: true, text: "降雨機率 (%)", color: "#475569" },
+                title: { display: true, text: "降雨機率 / 風險 (%)", color: "#475569" },
                 ticks: { color: "#64748b" },
                 grid: { color: "rgba(148, 163, 184, 0.24)" },
               },
@@ -1313,6 +1376,7 @@
               el.placeResults.replaceChildren();
               state.selectedPlace = place;
               renderOfficialForecast();
+              loadOfficialFramesSoon();
               synchronize(null, Number(place.latitude), Number(place.longitude));
             });
             el.placeResults.append(button);
@@ -1328,6 +1392,7 @@
       el.forecastForm.addEventListener("submit", synchronize);
       el.locationForm.addEventListener("submit", findLocation);
       renderOfficialForecast();
+      loadOfficialFramesSoon();
       synchronize();
     </script>
   </body>
