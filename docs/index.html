@@ -348,10 +348,6 @@
         background: #ffffff;
       }
 
-      .official-card.official-rain iframe {
-        height: 240px;
-      }
-
       .official-card.link-only {
         min-height: 180px;
         grid-template-rows: 1fr auto;
@@ -1123,29 +1119,20 @@
         return townTid ? `${cwaTownPageUrl}?TID=${encodeURIComponent(townTid)}` : cwaTownIndexUrl;
       }
 
-      function getCwaRainProbabilityUrl(place) {
-        const townTid = getCwaTownTid(place);
-        return townTid
-          ? `https://www.cwa.gov.tw/V8/C/W/Town/MOD/3hr/${encodeURIComponent(townTid)}_3hr_PC.html#PC3_Po`
-          : cwaTownIndexUrl;
-      }
-
       function renderOfficialForecast() {
         const place = state.selectedPlace;
         el.officialTitle.textContent = `${formatPlace(place)} 官方氣象預報`;
 
         if (isTaiwanPlace(place)) {
           const cwaTownUrl = getCwaTownUrl(place);
-          const cwaRainUrl = getCwaRainProbabilityUrl(place);
           el.officialForecast.innerHTML = `
             <div class="official-grid taiwan">
-              <article class="official-card official-rain">
+              <article class="official-card link-only">
                 <div>
                   <span>中央氣象署</span>
-                  <h3>72 小時降雨機率</h3>
+                  <h3>CWA 72 小時降雨機率</h3>
                 </div>
-                <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟完整官方頁</a>
-                <iframe title="中央氣象署 72 小時降雨機率" data-src="${cwaRainUrl}" loading="lazy"></iframe>
+                <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟 CWA 預報</a>
               </article>
             </div>
           `;
