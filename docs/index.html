@@ -749,18 +749,6 @@
           <div id="placeResults" class="place-results" aria-label="Location search results"></div>
         </form>
 
-        <form id="forecastForm" class="controls">
-          <label>
-            <span>Latitude</span>
-            <input id="latitudeInput" inputmode="decimal" value="25.03" />
-          </label>
-          <label>
-            <span>Longitude</span>
-            <input id="longitudeInput" inputmode="decimal" value="121.56" />
-          </label>
-          <button id="syncButton" type="submit">手動同步座標</button>
-        </form>
-
         <div class="meta-grid">
           <div>
             <span>模式</span>
@@ -971,10 +959,6 @@
         locationInput: document.querySelector("#locationInput"),
         locationButton: document.querySelector("#locationButton"),
         placeResults: document.querySelector("#placeResults"),
-        forecastForm: document.querySelector("#forecastForm"),
-        latitudeInput: document.querySelector("#latitudeInput"),
-        longitudeInput: document.querySelector("#longitudeInput"),
-        syncButton: document.querySelector("#syncButton"),
         updatedAt: document.querySelector("#updatedAt"),
         warning: document.querySelector("#warning"),
         error: document.querySelector("#error"),
@@ -1407,8 +1391,8 @@
 
       async function synchronize(event, overrideLat, overrideLon) {
         if (event) event.preventDefault();
-        const latitude = overrideLat ?? Number(el.latitudeInput.value);
-        const longitude = overrideLon ?? Number(el.longitudeInput.value);
+        const latitude = overrideLat ?? Number(state.selectedPlace.latitude);
+        const longitude = overrideLon ?? Number(state.selectedPlace.longitude);
         showBanner(el.error, "");
         showBanner(el.warning, "");
 
@@ -1476,8 +1460,6 @@
               ])
                 .filter(Boolean)
                 .join(" · ");
-              el.latitudeInput.value = Number(place.latitude).toFixed(5);
-              el.longitudeInput.value = Number(place.longitude).toFixed(5);
               el.placeResults.replaceChildren();
               state.selectedPlace = place;
               renderOfficialForecast();
@@ -1493,7 +1475,6 @@
         }
       }
 
-      el.forecastForm.addEventListener("submit", synchronize);
       el.locationForm.addEventListener("submit", findLocation);
       renderOfficialForecast();
       synchronize();
