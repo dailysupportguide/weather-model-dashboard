@@ -114,6 +114,7 @@ const DEFAULT_LATITUDE = 25.03;
 const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
+const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
 const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
 const CWA_RAIN_PROBABILITY_URL = "/cwa_rain_probability.json";
 const CWA_TOWN_INDEX_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
@@ -419,6 +420,42 @@ async function searchPlaces(query: string) {
   return [...taiwanMatches, ...globalResults];
 }
 
+async function lookupPlaceCoordinate(query: string) {
+  const places = await searchPlaces(query);
+  if (places.length) return places[0];
+
+  const params = new URLSearchParams({
+    q: query,
+    format: "jsonv2",
+    limit: "1",
+    "accept-language": "zh-TW,zh,en",
+  });
+  const response = await fetch(`${NOMINATIM_SEARCH_URL}?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`地標座標查詢失敗：${response.status}`);
+  }
+
+  const results = (await response.json()) as Array<{
+    display_name?: string;
+    lat?: string;
+    lon?: string;
+  }>;
+  const result = results[0];
+  const latitude = Number(result?.lat);
+  const longitude = Number(result?.lon);
+  if (!result || !validCoordinates(latitude, longitude)) return null;
+
+  return {
+    id: `osm-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
+    name: result.display_name?.split(",")[0] || query,
+    country: result.display_name || "",
+    country_code: "",
+    source: "coordinate" as const,
+    latitude,
+    longitude,
+  } satisfies Place;
+}
+
 async function searchTaiwanTowns(query: string) {
   const normalizedQuery = normalizeTaiwanText(query);
   const shouldPreferTaiwan =
@@ -502,8 +539,44 @@ function getCwaTownUrl(place: Place) {
     : CWA_TOWN_INDEX_URL;
 }
 
+function toDecimalDegrees(degrees: number, minutes = 0, seconds = 0, direction = "") {
+  const value = Math.abs(degrees) + Math.abs(minutes) / 60 + Math.abs(seconds) / 3600;
+  return /[SW南西]/i.test(direction) || degrees < 0 ? -value : value;
+}
+
+function validCoordinates(latitude: number, longitude: number) {
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+}
+
 function extractCoordinates(value: string) {
   const normalized = value.trim().replaceAll("，", ",");
+  const chineseLatitude = normalized.match(/([北南])緯\s*(\d+(?:\.\d+)?)\s*(?:[°度]\s*(?:(\d+(?:\.\d+)?)\s*(?:[′'分])?)?\s*(?:(\d+(?:\.\d+)?)\s*(?:[″"秒])?)?)?/);
+  const chineseLongitude = normalized.match(/([東西])經\s*(\d+(?:\.\d+)?)\s*(?:[°度]\s*(?:(\d+(?:\.\d+)?)\s*(?:[′'分])?)?\s*(?:(\d+(?:\.\d+)?)\s*(?:[″"秒])?)?)?/);
+  if (chineseLatitude && chineseLongitude) {
+    const latitude = toDecimalDegrees(
+      Number(chineseLatitude[2]),
+      Number(chineseLatitude[3] || 0),
+      Number(chineseLatitude[4] || 0),
+      chineseLatitude[1],
+    );
+    const longitude = toDecimalDegrees(
+      Number(chineseLongitude[2]),
+      Number(chineseLongitude[3] || 0),
+      Number(chineseLongitude[4] || 0),
+      chineseLongitude[1],
+    );
+    if (validCoordinates(latitude, longitude)) return { latitude, longitude };
+  }
+
+  const directionalDecimal = normalized.match(
+    /(-?\d+(?:\.\d+)?)\s*°?\s*([NS北南])\s*[, ]+\s*(-?\d+(?:\.\d+)?)\s*°?\s*([EW東西])/i,
+  );
+  if (directionalDecimal) {
+    const latitude = toDecimalDegrees(Number(directionalDecimal[1]), 0, 0, directionalDecimal[2]);
+    const longitude = toDecimalDegrees(Number(directionalDecimal[3]), 0, 0, directionalDecimal[4]);
+    if (validCoordinates(latitude, longitude)) return { latitude, longitude };
+  }
+
   const patterns = [
     /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
     /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
@@ -515,7 +588,7 @@ function extractCoordinates(value: string) {
     if (!match) continue;
     const lat = Number(match[1]);
     const lon = Number(match[2]);
-    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    if (validCoordinates(lat, lon)) {
       return { latitude: lat, longitude: lon };
     }
   }
@@ -626,16 +699,28 @@ export default function Home() {
     void synchronize(undefined, lat, lon);
   }
 
-  function openGoogleCoordinateSearch(event: FormEvent) {
+  async function lookupCoordinatesInBackground(event: FormEvent) {
     event.preventDefault();
     const query = googleCoordinateQuery.trim() || locationQuery.trim();
     if (!query) {
-      setError("請輸入要用 Google 查詢的地點。");
+      setError("請輸入要查詢經緯度的地點。");
       return;
     }
 
-    const url = `https://www.google.com/search?q=${encodeURIComponent(`${query} 經緯度`)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    try {
+      const place = await lookupPlaceCoordinate(query);
+      if (!place) {
+        setError("找不到座標，請改貼 Google Maps 網址或 Google 顯示的經緯度文字。");
+        return;
+      }
+
+      setError("");
+      setLatitude(place.latitude.toFixed(5));
+      setLongitude(place.longitude.toFixed(5));
+      setGoogleCoordinateInput(`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "查詢座標時發生未知錯誤。");
+    }
   }
 
   function applyGoogleCoordinateInput(event: FormEvent) {
@@ -647,6 +732,14 @@ export default function Home() {
     }
 
     setError("");
+    setLatitude(coordinates.latitude.toFixed(5));
+    setLongitude(coordinates.longitude.toFixed(5));
+  }
+
+  function updateGoogleCoordinateInput(value: string) {
+    setGoogleCoordinateInput(value);
+    const coordinates = extractCoordinates(value);
+    if (!coordinates) return;
     setLatitude(coordinates.latitude.toFixed(5));
     setLongitude(coordinates.longitude.toFixed(5));
   }
@@ -927,25 +1020,25 @@ export default function Home() {
 
         <details className="coordinate-panel">
           <summary>使用經緯度查詢</summary>
-          <form className="google-coordinate-controls" onSubmit={openGoogleCoordinateSearch}>
+          <form className="google-coordinate-controls" onSubmit={lookupCoordinatesInBackground}>
             <label>
-              <span>Google 搜尋</span>
+              <span>地點查座標</span>
               <input
                 value={googleCoordinateQuery}
                 onChange={(event) => setGoogleCoordinateQuery(event.target.value)}
                 placeholder="輸入地點快速查經緯度"
-                aria-label="Google coordinate search"
+                aria-label="Coordinate lookup"
               />
             </label>
-            <button type="submit">Google 查座標</button>
+            <button type="submit">後台查座標</button>
           </form>
           <form className="google-coordinate-controls" onSubmit={applyGoogleCoordinateInput}>
             <label>
               <span>貼上座標或 Google Maps 網址</span>
               <input
                 value={googleCoordinateInput}
-                onChange={(event) => setGoogleCoordinateInput(event.target.value)}
-                placeholder="25.03300, 121.56500"
+                onChange={(event) => updateGoogleCoordinateInput(event.target.value)}
+                placeholder="北緯 34°36′59″、東經 135°01′13″"
                 aria-label="Paste Google coordinates"
               />
             </label>
@@ -972,6 +1065,7 @@ export default function Home() {
             </label>
             <button type="submit">套用經緯度</button>
           </form>
+          <p className="coordinate-note">後台地標查詢輔助來源：Open-Meteo Geocoding / OpenStreetMap Nominatim。</p>
         </details>
 
         <div className="meta-grid">

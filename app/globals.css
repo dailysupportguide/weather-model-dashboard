@@ -168,6 +168,13 @@ h1 {
   background: #334155;
 }
 
+.coordinate-note {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr)) minmax(180px, auto);
