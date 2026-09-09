@@ -288,6 +288,10 @@
         gap: 12px;
       }
 
+      .official-grid.taiwan {
+        grid-template-columns: 1fr;
+      }
+
       .official-card {
         display: grid;
         grid-template-rows: auto auto 1fr;
@@ -342,6 +346,10 @@
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         background: #ffffff;
+      }
+
+      .official-card.official-rain iframe {
+        height: 240px;
       }
 
       .official-card.link-only {
@@ -913,7 +921,6 @@
       };
       const cwaTownIndexUrl = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
       const cwaTownPageUrl = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
-      const cwaQpfUrl = "https://www.cwa.gov.tw/V8/C/P/QPF.html";
       const officialServices = {
         JP: {
           label: "日本",
@@ -1116,29 +1123,29 @@
         return townTid ? `${cwaTownPageUrl}?TID=${encodeURIComponent(townTid)}` : cwaTownIndexUrl;
       }
 
+      function getCwaRainProbabilityUrl(place) {
+        const townTid = getCwaTownTid(place);
+        return townTid
+          ? `https://www.cwa.gov.tw/V8/C/W/Town/MOD/3hr/${encodeURIComponent(townTid)}_3hr_PC.html#PC3_Po`
+          : cwaTownIndexUrl;
+      }
+
       function renderOfficialForecast() {
         const place = state.selectedPlace;
         el.officialTitle.textContent = `${formatPlace(place)} 官方氣象預報`;
 
         if (isTaiwanPlace(place)) {
           const cwaTownUrl = getCwaTownUrl(place);
+          const cwaRainUrl = getCwaRainProbabilityUrl(place);
           el.officialForecast.innerHTML = `
             <div class="official-grid taiwan">
-              <article class="official-card">
+              <article class="official-card official-rain">
                 <div>
                   <span>中央氣象署</span>
-                  <h3>鄉鎮預報</h3>
+                  <h3>72 小時降雨機率</h3>
                 </div>
-                <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟官方頁</a>
-                <iframe title="中央氣象署鄉鎮預報" data-src="${cwaTownUrl}" loading="lazy"></iframe>
-              </article>
-              <article class="official-card">
-                <div>
-                  <span>中央氣象署</span>
-                  <h3>定量降水預報 QPF</h3>
-                </div>
-                <a href="${cwaQpfUrl}" target="_blank" rel="noreferrer">開啟官方頁</a>
-                <iframe title="中央氣象署定量降水預報" data-src="${cwaQpfUrl}" loading="lazy"></iframe>
+                <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟完整官方頁</a>
+                <iframe title="中央氣象署 72 小時降雨機率" data-src="${cwaRainUrl}" loading="lazy"></iframe>
               </article>
             </div>
           `;

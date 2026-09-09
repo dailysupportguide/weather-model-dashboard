@@ -326,6 +326,10 @@ h1 {
   gap: 12px;
 }
 
+.official-grid.taiwan {
+  grid-template-columns: 1fr;
+}
+
 .official-card {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -380,6 +384,10 @@ h1 {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.official-card.official-rain iframe {
+  height: 240px;
 }
 
 .official-card.link-only {
