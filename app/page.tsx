@@ -2,6 +2,12 @@
 
 import Script from "next/script";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  EUROPEAN_MODELS,
+  FORECAST_MODE,
+  GOOGLE_MODEL,
+  UPGRADE_POLICY,
+} from "./modelRegistry";
 
 type ForecastJson = {
   model?: string;
@@ -11,8 +17,7 @@ type ForecastJson = {
   hourly?: {
     time?: string[];
     temperature_2m?: Array<number | null>;
-    temperature_2m_ecmwf_ifs025?: Array<number | null>;
-    temperature_2m_ecmwf_aifs025?: Array<number | null>;
+    [key: string]: string[] | Array<number | null> | undefined;
   };
 };
 
@@ -76,12 +81,18 @@ function formatHourLabel(value: string) {
   }).format(parsed);
 }
 
-function pickSeries(data: ForecastJson, key: keyof NonNullable<ForecastJson["hourly"]>) {
+function pickSeries(data: ForecastJson, fieldCandidates: readonly string[]) {
   const hourly = data.hourly ?? {};
   const time = Array.isArray(hourly.time) ? hourly.time : [];
-  const values = Array.isArray(hourly[key]) ? hourly[key] : [];
+  const firstAvailableField = fieldCandidates.find((field) =>
+    Array.isArray(hourly[field]),
+  );
+  const values = firstAvailableField ? hourly[firstAvailableField] : [];
 
-  return { time, values };
+  return {
+    time,
+    values: Array.isArray(values) ? (values as Array<number | null>) : [],
+  };
 }
 
 function seriesToMap(series: Series) {
@@ -112,16 +123,16 @@ async function fetchForecasts(latitude: number, longitude: number) {
     latitude: String(latitude),
     longitude: String(longitude),
     hourly: "temperature_2m",
-    models: "ecmwf_ifs025,ecmwf_aifs025",
-    forecast_days: "2",
+    models: EUROPEAN_MODELS.map((model) => model.modelId).join(","),
+    forecast_days: FORECAST_MODE.forecastDays,
     timezone: "auto",
   });
 
   const [openMeteoResult, deepmindResult] = await Promise.all([
     fetch(`${OPEN_METEO_URL}?${params.toString()}`),
-    fetch(`/deepmind_forecast.json?ts=${Date.now()}`).then(async (response) => {
+    fetch(`${GOOGLE_MODEL.dataUrl}?ts=${Date.now()}`).then(async (response) => {
       if (!response.ok) {
-        throw new Error("DeepMind forecast file is not available.");
+        throw new Error("Google model forecast file is not available.");
       }
       return (await response.json()) as ForecastJson;
     }),
@@ -136,36 +147,28 @@ async function fetchForecasts(latitude: number, longitude: number) {
   }
 
   const openMeteo = (await openMeteoResult.json()) as ForecastJson;
-  const ifs = pickSeries(openMeteo, "temperature_2m_ecmwf_ifs025");
-  const aifs = pickSeries(openMeteo, "temperature_2m_ecmwf_aifs025");
-  const fallback = pickSeries(openMeteo, "temperature_2m");
+  const openSeries: Series[] = EUROPEAN_MODELS.map((model) => {
+    const forecast = pickSeries(openMeteo, model.fieldCandidates);
 
-  const openSeries: Series[] = [
-    {
-      label: "ECMWF IFS 物理",
-      source: "ifs",
-      times: ifs.time,
-      values: ifs.values.length ? ifs.values : fallback.values,
-    },
-    {
-      label: "ECMWF AIFS 歐洲 AI",
-      source: "aifs",
-      times: aifs.time,
-      values: aifs.values.length ? aifs.values : fallback.values,
-    },
-  ];
+    return {
+      label: model.label,
+      source: model.key,
+      times: forecast.time,
+      values: forecast.values,
+    };
+  });
 
   const deepmind =
     "error" in deepmindResult
       ? null
-      : pickSeries(deepmindResult as ForecastJson, "temperature_2m");
+      : pickSeries(deepmindResult as ForecastJson, GOOGLE_MODEL.fieldCandidates);
 
   const allSeries = deepmind
     ? [
         ...openSeries,
         {
-          label: "Google DeepMind WeatherNext",
-          source: "deepmind",
+          label: GOOGLE_MODEL.label,
+          source: GOOGLE_MODEL.key,
           times: deepmind.time,
           values: deepmind.values,
         },
@@ -173,11 +176,11 @@ async function fetchForecasts(latitude: number, longitude: number) {
     : openSeries;
 
   let aligned = alignForecasts(allSeries);
-  let warning = deepmind ? "" : "DeepMind 離線推論數據未就緒，僅呈現歐洲雙核心";
+  let warning = deepmind ? "" : "Google 模型離線推論數據未就緒，僅呈現歐洲雙核心";
 
   if (deepmind && aligned.labels.length === 0) {
     aligned = alignForecasts(openSeries);
-    warning = "DeepMind 離線推論數據時間軸未對齊，僅呈現歐洲雙核心";
+    warning = "Google 模型離線推論數據時間軸未對齊，僅呈現歐洲雙核心";
   }
 
   return {
@@ -312,35 +315,21 @@ export default function Home() {
         labels: aligned.labels.map(formatHourLabel),
         datasets: [
           {
-            label: "ECMWF IFS 物理",
+            label: EUROPEAN_MODELS[0].label,
             data: aligned.ifs,
-            borderColor: "#0284c7",
-            backgroundColor: "rgba(2, 132, 199, 0.12)",
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.32,
+            ...EUROPEAN_MODELS[0].style,
           },
           {
-            label: "ECMWF AIFS 歐洲 AI",
+            label: EUROPEAN_MODELS[1].label,
             data: aligned.aifs,
-            borderColor: "#db2777",
-            backgroundColor: "rgba(219, 39, 119, 0.12)",
-            borderDash: [5, 5],
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.32,
+            ...EUROPEAN_MODELS[1].style,
           },
           ...(aligned.deepmind
             ? [
                 {
-                  label: "Google DeepMind AI",
+                  label: GOOGLE_MODEL.label,
                   data: aligned.deepmind,
-                  borderColor: "#16a34a",
-                  backgroundColor: "rgba(22, 163, 74, 0.14)",
-                  borderWidth: 3,
-                  pointRadius: 3,
-                  pointHoverRadius: 5,
-                  tension: 0.32,
+                  ...GOOGLE_MODEL.style,
                 },
               ]
             : []),
@@ -396,7 +385,7 @@ export default function Home() {
           <h1>全球三核心氣象模型預測對比儀表板</h1>
           <p className="lead">
             以未來 48 小時逐時氣溫作為三方模型交集窗口，將 ECMWF IFS、
-            ECMWF AIFS 與 Google DeepMind WeatherNext 對齊到同一條時間軸。
+            ECMWF AIFS 與 Google WeatherNext / GraphCast 對齊到同一條時間軸。
           </p>
         </div>
 
@@ -466,7 +455,7 @@ export default function Home() {
         <div className="meta-grid">
           <div>
             <span>模式</span>
-            <strong>標準 48 小時</strong>
+            <strong>{FORECAST_MODE.label}</strong>
           </div>
           <div>
             <span>資料對齊</span>
@@ -482,6 +471,21 @@ export default function Home() {
       {warning ? <div className="warning-banner">{warning}</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
+      <section className="model-registry" aria-label="Model registry">
+        <div>
+          <span>歐洲模型</span>
+          <strong>{EUROPEAN_MODELS.map((model) => model.modelId).join(" / ")}</strong>
+        </div>
+        <div>
+          <span>Google 模型來源</span>
+          <strong>{GOOGLE_MODEL.provider}</strong>
+        </div>
+        <div>
+          <span>升級策略</span>
+          <strong>{UPGRADE_POLICY[2]}</strong>
+        </div>
+      </section>
+
       <section className="chart-section" aria-label="Hourly temperature comparison">
         <div className="chart-heading">
           <div>
@@ -491,7 +495,7 @@ export default function Home() {
           <div className="legend-notes">
             <span className="ifs">IFS</span>
             <span className="aifs">AIFS</span>
-            <span className="deepmind">DeepMind</span>
+            <span className="deepmind">Google AI</span>
           </div>
         </div>
 

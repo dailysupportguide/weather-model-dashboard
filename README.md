@@ -9,6 +9,7 @@
 - 從 `public/deepmind_forecast.json` 讀取 DeepMind 離線推論結果
 - 以時間戳交集裁切三方資料，預設對齊未來 48 小時逐時預報
 - DeepMind JSON 缺失或時間軸不匹配時，自動降級顯示歐洲雙核心並顯示警告
+- 以 `app/modelRegistry.ts` 管理模型來源，方便未來切換新版 ECMWF 或 Google WeatherNext / GraphCast 資料源
 
 ## 本機執行
 
@@ -16,6 +17,14 @@
 pnpm install
 pnpm run dev
 ```
+
+## 模型升級
+
+模型版本集中在 `app/modelRegistry.ts`：
+
+- 歐洲模型更新時，修改 `EUROPEAN_MODELS[].modelId` 與 `fieldCandidates`
+- Google 模型更新時，修改 `GOOGLE_MODEL.dataUrl`，或在 Colab notebook 的 `run_deepmind_adapter()` 改接新版 WeatherNext / GraphCast
+- 前端對齊邏輯不需要重寫，仍會以啟用模型的共同時間戳交集作圖
 
 ## 更新 DeepMind JSON
 
