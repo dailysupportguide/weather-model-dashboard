@@ -121,7 +121,8 @@ h1 {
   box-shadow: 0 20px 54px rgba(15, 23, 42, 0.09);
 }
 
-.location-controls {
+.location-controls,
+.coordinate-lookup-controls {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: minmax(220px, 1fr) minmax(132px, auto);
@@ -182,6 +183,7 @@ h1 {
 }
 
 .location-controls label,
+.coordinate-lookup-controls label,
 .coordinate-controls label,
 .google-coordinate-controls label,
 .controls label {
@@ -190,6 +192,7 @@ h1 {
 }
 
 .location-controls span,
+.coordinate-lookup-controls span,
 .coordinate-controls span,
 .google-coordinate-controls span,
 .controls span,
@@ -200,6 +203,7 @@ h1 {
 }
 
 .location-controls input,
+.coordinate-lookup-controls input,
 .coordinate-controls input,
 .google-coordinate-controls input,
 .controls input {
@@ -214,6 +218,7 @@ h1 {
 }
 
 .location-controls input:focus,
+.coordinate-lookup-controls input:focus,
 .coordinate-controls input:focus,
 .google-coordinate-controls input:focus,
 .controls input:focus {
@@ -222,6 +227,7 @@ h1 {
 }
 
 .location-controls button,
+.coordinate-lookup-controls button,
 .coordinate-controls button,
 .google-coordinate-controls button,
 .controls button {
@@ -241,6 +247,7 @@ h1 {
 }
 
 .location-controls button:disabled,
+.coordinate-lookup-controls button:disabled,
 .coordinate-controls button:disabled,
 .google-coordinate-controls button:disabled,
 .controls button:disabled {
@@ -622,6 +629,10 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .coordinate-lookup-controls {
+    grid-template-columns: 1fr;
+  }
+
   .coordinate-controls {
     grid-template-columns: 1fr;
   }
@@ -688,6 +699,7 @@ h1 {
   }
 
   .location-controls,
+  .coordinate-lookup-controls,
   .coordinate-controls,
   .google-coordinate-controls,
   .controls {
@@ -703,10 +715,12 @@ h1 {
   }
 
   .location-controls input,
+  .coordinate-lookup-controls input,
   .coordinate-controls input,
   .google-coordinate-controls input,
   .controls input,
   .location-controls button,
+  .coordinate-lookup-controls button,
   .coordinate-controls button,
   .google-coordinate-controls button,
   .controls button {

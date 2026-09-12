@@ -115,6 +115,7 @@ const DEFAULT_LONGITUDE = 121.56;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
 const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
 const CWA_RAIN_PROBABILITY_URL = "/cwa_rain_probability.json";
 const CWA_TOWN_INDEX_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
@@ -420,14 +421,25 @@ async function searchPlaces(query: string) {
   return [...taiwanMatches, ...globalResults];
 }
 
-async function lookupPlaceCoordinate(query: string) {
-  const places = await searchPlaces(query);
-  if (places.length) return places[0];
+async function getTaiwanTowns() {
+  if (!taiwanTownCache) {
+    const response = await fetch(`${TAIWAN_TOWNS_URL}?ts=20260910`);
+    if (!response.ok) {
+      taiwanTownCache = [];
+    } else {
+      taiwanTownCache = (await response.json()) as TaiwanTown[];
+    }
+  }
 
+  return taiwanTownCache;
+}
+
+async function searchNominatimPlaces(query: string) {
   const params = new URLSearchParams({
     q: query,
     format: "jsonv2",
-    limit: "1",
+    limit: "6",
+    addressdetails: "1",
     "accept-language": "zh-TW,zh,en",
   });
   const response = await fetch(`${NOMINATIM_SEARCH_URL}?${params.toString()}`);
@@ -436,24 +448,131 @@ async function lookupPlaceCoordinate(query: string) {
   }
 
   const results = (await response.json()) as Array<{
+    address?: {
+      city?: string;
+      city_district?: string;
+      country?: string;
+      country_code?: string;
+      county?: string;
+      state?: string;
+      suburb?: string;
+      town?: string;
+      village?: string;
+    };
     display_name?: string;
     lat?: string;
     lon?: string;
   }>;
-  const result = results[0];
-  const latitude = Number(result?.lat);
-  const longitude = Number(result?.lon);
-  if (!result || !validCoordinates(latitude, longitude)) return null;
 
+  return Promise.all(
+    results
+      .map((result) => {
+        const latitude = Number(result.lat);
+        const longitude = Number(result.lon);
+        if (!validCoordinates(latitude, longitude)) return null;
+
+        return {
+          id: `osm-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
+          name: result.display_name?.split(",")[0] || query,
+          admin1: result.address?.state || result.address?.city || result.address?.county,
+          admin2:
+            result.address?.city_district ||
+            result.address?.suburb ||
+            result.address?.town ||
+            result.address?.village,
+          country: result.address?.country || result.display_name || "",
+          country_code: result.address?.country_code?.toUpperCase() || "",
+          source: "coordinate" as const,
+          latitude,
+          longitude,
+        } satisfies Place;
+      })
+      .filter((place): place is Place => Boolean(place))
+      .map(resolveOfficialPlace),
+  );
+}
+
+async function reverseNominatimPlace(latitude: number, longitude: number) {
+  const params = new URLSearchParams({
+    lat: String(latitude),
+    lon: String(longitude),
+    format: "jsonv2",
+    zoom: "12",
+    addressdetails: "1",
+    "accept-language": "zh-TW,zh,en",
+  });
+  const response = await fetch(`${NOMINATIM_REVERSE_URL}?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`座標反查地點失敗：${response.status}`);
+  }
+
+  const result = (await response.json()) as {
+    address?: {
+      city?: string;
+      city_district?: string;
+      country?: string;
+      country_code?: string;
+      county?: string;
+      state?: string;
+      suburb?: string;
+      town?: string;
+      village?: string;
+    };
+    display_name?: string;
+    lat?: string;
+    lon?: string;
+    name?: string;
+  };
+  const address = result.address || {};
   return {
-    id: `osm-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
-    name: result.display_name?.split(",")[0] || query,
-    country: result.display_name || "",
-    country_code: "",
+    id: `coordinate-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
+    name:
+      result.name ||
+      address.city_district ||
+      address.suburb ||
+      address.town ||
+      address.city ||
+      result.display_name?.split(",")[0] ||
+      "經緯度查詢",
+    admin1: address.state || address.city || address.county,
+    admin2: address.city_district || address.suburb || address.town || address.village,
+    country: address.country || result.display_name || "",
+    country_code: address.country_code?.toUpperCase() || "",
     source: "coordinate" as const,
     latitude,
     longitude,
   } satisfies Place;
+}
+
+async function searchCoordinatePlaces(query: string) {
+  const coordinates = extractCoordinates(query);
+  if (coordinates) {
+    const reversePlace = await reverseNominatimPlace(coordinates.latitude, coordinates.longitude).catch(() => null);
+    return [
+      await resolveOfficialPlace(
+        reversePlace || {
+          id: `coordinate-${coordinates.latitude.toFixed(5)}-${coordinates.longitude.toFixed(5)}`,
+          name: "經緯度查詢",
+          country: "",
+          country_code: "",
+          source: "coordinate",
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+        },
+      ),
+    ];
+  }
+
+  const cityPlaces = await Promise.all((await searchPlaces(query)).map(resolveOfficialPlace));
+  const landmarkPlaces = await searchNominatimPlaces(query).catch(() => []);
+  const seen = new Set<string>();
+
+  return [...cityPlaces, ...landmarkPlaces].filter((place) => {
+    const key = `${place.id}-${place.latitude.toFixed(3)}-${place.longitude.toFixed(3)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function searchTaiwanTowns(query: string) {
@@ -468,15 +587,9 @@ async function searchTaiwanTowns(query: string) {
     return [];
   }
 
-  if (!taiwanTownCache) {
-    const response = await fetch(`${TAIWAN_TOWNS_URL}?ts=20260910`);
-    if (!response.ok) {
-      return [];
-    }
-    taiwanTownCache = (await response.json()) as TaiwanTown[];
-  }
+  const towns = await getTaiwanTowns();
 
-  return taiwanTownCache
+  return towns
     .filter((town) =>
       normalizeTaiwanText(`${town.county}${town.name}`).includes(normalizedQuery) ||
       normalizeTaiwanText(town.name).includes(normalizedQuery) ||
@@ -489,10 +602,70 @@ async function searchTaiwanTowns(query: string) {
       county: town.county,
       admin1: town.county,
       country: "台灣",
+      country_code: "TW",
       latitude: town.latitude,
       longitude: town.longitude,
       source: "taiwan-town" as const,
     }));
+}
+
+async function resolveOfficialPlace(place: Place) {
+  if (place.source === "taiwan-town") return place;
+  if (place.country_code !== "TW" && !isCoordinateInTaiwan(place.latitude, place.longitude)) return place;
+
+  const town = await matchedTaiwanTown(place);
+  if (!town) return place;
+
+  return {
+    ...place,
+    id: town.id,
+    county: town.county,
+    admin1: town.county,
+    country: "台灣",
+    country_code: "TW",
+    source: "taiwan-town" as const,
+  };
+}
+
+async function matchedTaiwanTown(place: Place) {
+  const towns = await getTaiwanTowns();
+  const countyCandidates = [place.county, place.admin1, place.country].map((value) =>
+    normalizeTaiwanText(value || ""),
+  );
+  const districtCandidates = [place.admin2, place.name].map((value) => normalizeTaiwanText(value || ""));
+
+  const exact = towns.find((town) => {
+    const county = normalizeTaiwanText(town.county);
+    const name = normalizeTaiwanText(town.name);
+    const countyMatches = countyCandidates.some((candidate) => candidate && (county.includes(candidate) || candidate.includes(county)));
+    return districtCandidates.includes(name) && countyMatches;
+  });
+
+  if (exact) return exact;
+
+  const sameDistrict = towns.find((town) => districtCandidates.includes(normalizeTaiwanText(town.name)));
+  return sameDistrict || nearestTaiwanTownFromList(towns, place.latitude, place.longitude);
+}
+
+function isCoordinateInTaiwan(latitude: number, longitude: number) {
+  return latitude >= 21.7 && latitude <= 25.5 && longitude >= 119 && longitude <= 122.5;
+}
+
+function nearestTaiwanTownFromList(towns: TaiwanTown[], latitude: number, longitude: number) {
+  let nearest: TaiwanTown | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const town of towns) {
+    const latDelta = latitude - town.latitude;
+    const lonDelta = (longitude - town.longitude) * Math.cos((latitude * Math.PI) / 180);
+    const distance = latDelta * latDelta + lonDelta * lonDelta;
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = town;
+    }
+  }
+
+  return nearest;
 }
 
 function formatPlace(place: Place) {
@@ -604,10 +777,6 @@ export default function Home() {
   const [locationQuery, setLocationQuery] = useState("台北市");
   const [places, setPlaces] = useState<Place[]>([]);
   const [geocodeState, setGeocodeState] = useState<GeocodeState>("idle");
-  const [latitude, setLatitude] = useState(String(DEFAULT_LATITUDE));
-  const [longitude, setLongitude] = useState(String(DEFAULT_LONGITUDE));
-  const [googleCoordinateQuery, setGoogleCoordinateQuery] = useState("");
-  const [googleCoordinateInput, setGoogleCoordinateInput] = useState("");
   const [chartReady, setChartReady] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [aligned, setAligned] = useState<AlignedForecast | null>(null);
@@ -636,112 +805,45 @@ export default function Home() {
     return "待同步";
   }, [loadState, pointCount]);
 
-  async function findLocation(event?: FormEvent) {
-    event?.preventDefault();
-
-    if (!locationQuery.trim()) {
-      setGeocodeState("error");
-      setError("請輸入城市或地點名稱。");
-      return;
-    }
-
-    setGeocodeState("searching");
-    setError("");
-
-    try {
-      const results = await searchPlaces(locationQuery.trim());
-      setPlaces(results);
-      setGeocodeState(results.length ? "ready" : "error");
-
-      if (!results.length) {
-        setError("找不到符合的地點，請改用更完整的城市或地名。");
-      }
-    } catch (caught) {
-      setGeocodeState("error");
-      setError(caught instanceof Error ? caught.message : "地點搜尋時發生未知錯誤。");
-    }
-  }
-
   function selectPlace(place: Place) {
     setLocationQuery(formatPlace(place));
-    setLatitude(place.latitude.toFixed(5));
-    setLongitude(place.longitude.toFixed(5));
     setPlaces([]);
     setSelectedPlace(place);
     setGeocodeState("idle");
     void synchronize(undefined, place.latitude, place.longitude);
   }
 
-  function syncCoordinates(event: FormEvent) {
-    event.preventDefault();
-    const lat = Number(latitude);
-    const lon = Number(longitude);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      setLoadState("error");
-      setError("請輸入有效的經緯度數值。");
-      return;
-    }
-
-    const coordinatePlace: Place = {
-      id: `coordinate-${lat.toFixed(5)}-${lon.toFixed(5)}`,
-      name: "經緯度查詢",
-      country: "",
-      country_code: "",
-      source: "coordinate",
-      latitude: lat,
-      longitude: lon,
-    };
-
-    setPlaces([]);
-    setLocationQuery(`${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-    setSelectedPlace(coordinatePlace);
-    void synchronize(undefined, lat, lon);
-  }
-
   async function lookupCoordinatesInBackground(event: FormEvent) {
     event.preventDefault();
-    const query = googleCoordinateQuery.trim() || locationQuery.trim();
+    const query = locationQuery.trim();
     if (!query) {
       setError("請輸入要查詢經緯度的地點。");
       return;
     }
 
+    setGeocodeState("searching");
+    setError("");
+    setPlaces([]);
+
     try {
-      const place = await lookupPlaceCoordinate(query);
-      if (!place) {
+      const results = await searchCoordinatePlaces(query);
+      if (!results.length) {
+        setGeocodeState("error");
         setError("找不到座標，請改貼 Google Maps 網址或 Google 顯示的經緯度文字。");
         return;
       }
 
-      setError("");
-      setLatitude(place.latitude.toFixed(5));
-      setLongitude(place.longitude.toFixed(5));
-      setGoogleCoordinateInput(`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`);
+      if (results.length === 1) {
+        selectPlace(results[0]);
+        return;
+      }
+
+      setPlaces(results);
+      setGeocodeState("ready");
     } catch (caught) {
+      setGeocodeState("error");
       setError(caught instanceof Error ? caught.message : "查詢座標時發生未知錯誤。");
     }
-  }
-
-  function applyGoogleCoordinateInput(event: FormEvent) {
-    event.preventDefault();
-    const coordinates = extractCoordinates(googleCoordinateInput);
-    if (!coordinates) {
-      setError("無法辨識座標，請貼上 Google Maps 網址或 25.03300, 121.56500 這種格式。");
-      return;
-    }
-
-    setError("");
-    setLatitude(coordinates.latitude.toFixed(5));
-    setLongitude(coordinates.longitude.toFixed(5));
-  }
-
-  function updateGoogleCoordinateInput(value: string) {
-    setGoogleCoordinateInput(value);
-    const coordinates = extractCoordinates(value);
-    if (!coordinates) return;
-    setLatitude(coordinates.latitude.toFixed(5));
-    setLongitude(coordinates.longitude.toFixed(5));
   }
 
   async function synchronize(event?: FormEvent, overrideLat?: number, overrideLon?: number) {
@@ -750,8 +852,8 @@ export default function Home() {
     setError("");
     setWarning("");
 
-    const lat = overrideLat ?? Number(latitude);
-    const lon = overrideLon ?? Number(longitude);
+    const lat = overrideLat ?? Number(selectedPlace.latitude);
+    const lon = overrideLon ?? Number(selectedPlace.longitude);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       setLoadState("error");
@@ -978,19 +1080,19 @@ export default function Home() {
       </section>
 
       <section className="control-band" aria-label="Forecast controls">
-        <form className="location-controls" onSubmit={findLocation}>
+        <form className="coordinate-lookup-controls" onSubmit={lookupCoordinatesInBackground}>
           <label>
-            <span>地點</span>
+            <span>地點查座標</span>
             <input
               value={locationQuery}
               onChange={(event) => setLocationQuery(event.target.value)}
-              placeholder="台灣可輸入鄉鎮市區，國外輸入城市"
-              aria-label="Location"
+              placeholder="輸入地點、Google 座標文字或 Google Maps 網址"
+              aria-label="Coordinate lookup"
             />
           </label>
           <button type="submit" disabled={geocodeState === "searching"}>
             {geocodeState === "searching" ? <span className="spinner" aria-hidden="true" /> : null}
-            搜尋地點
+            後台查座標
           </button>
           {places.length ? (
             <div className="place-results" aria-label="Location search results">
@@ -1004,7 +1106,7 @@ export default function Home() {
                   <strong>{place.name}</strong>
                   <span>
                     {uniquePlaceParts([
-                      place.source === "taiwan-town" ? "鄉鎮市區" : "城市",
+                      place.source === "taiwan-town" ? "台灣鄉鎮市區" : "地點",
                       place.county || place.admin2,
                       place.admin1,
                       place.country,
@@ -1017,56 +1119,7 @@ export default function Home() {
             </div>
           ) : null}
         </form>
-
-        <details className="coordinate-panel">
-          <summary>使用經緯度查詢</summary>
-          <form className="google-coordinate-controls" onSubmit={lookupCoordinatesInBackground}>
-            <label>
-              <span>地點查座標</span>
-              <input
-                value={googleCoordinateQuery}
-                onChange={(event) => setGoogleCoordinateQuery(event.target.value)}
-                placeholder="輸入地點快速查經緯度"
-                aria-label="Coordinate lookup"
-              />
-            </label>
-            <button type="submit">後台查座標</button>
-          </form>
-          <form className="google-coordinate-controls" onSubmit={applyGoogleCoordinateInput}>
-            <label>
-              <span>貼上座標或 Google Maps 網址</span>
-              <input
-                value={googleCoordinateInput}
-                onChange={(event) => updateGoogleCoordinateInput(event.target.value)}
-                placeholder="北緯 34°36′59″、東經 135°01′13″"
-                aria-label="Paste Google coordinates"
-              />
-            </label>
-            <button type="submit">整理座標</button>
-          </form>
-          <form className="coordinate-controls" onSubmit={syncCoordinates}>
-            <label>
-              <span>Latitude</span>
-              <input
-                value={latitude}
-                onChange={(event) => setLatitude(event.target.value)}
-                inputMode="decimal"
-                aria-label="Latitude"
-              />
-            </label>
-            <label>
-              <span>Longitude</span>
-              <input
-                value={longitude}
-                onChange={(event) => setLongitude(event.target.value)}
-                inputMode="decimal"
-                aria-label="Longitude"
-              />
-            </label>
-            <button type="submit">套用經緯度</button>
-          </form>
-          <p className="coordinate-note">後台地標查詢輔助來源：Open-Meteo Geocoding / OpenStreetMap Nominatim。</p>
-        </details>
+        <p className="coordinate-note">可輸入地名、Google 顯示的座標文字、Google Maps URL；台灣地標會自動對應最近鄉鎮預報。</p>
 
         <div className="meta-grid">
           <div>
