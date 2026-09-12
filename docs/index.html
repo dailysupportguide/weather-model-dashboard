@@ -336,7 +336,7 @@
       }
 
       .official-grid.taiwan {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
       }
 
       .official-card {
@@ -435,6 +435,40 @@
       .official-card.link-only {
         min-height: 180px;
         grid-template-rows: 1fr auto;
+      }
+
+      .official-card.qpf-card {
+        min-height: 280px;
+        border-color: rgba(14, 165, 233, 0.32);
+        background: linear-gradient(180deg, rgba(240, 249, 255, 0.96), rgba(255, 255, 255, 0.92));
+      }
+
+      .qpf-preview-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .qpf-preview {
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid #dbe5ef;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .qpf-preview figcaption {
+        padding: 7px 8px;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 850;
+      }
+
+      .qpf-preview img {
+        display: block;
+        width: 100%;
+        height: auto;
       }
 
       .chart-heading {
@@ -659,6 +693,14 @@
         .official-grid {
           grid-template-columns: 1fr;
         }
+
+        .official-grid.taiwan {
+          grid-template-columns: 1fr;
+        }
+
+        .qpf-preview-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
 
       @media (max-width: 560px) {
@@ -754,6 +796,10 @@
 
         .official-card.link-only {
           min-height: 142px;
+        }
+
+        .qpf-preview-grid {
+          grid-template-columns: 1fr;
         }
 
         .chart-heading {
@@ -1014,6 +1060,11 @@
       let cwaRainCache = null;
       const cwaTownIndexUrl = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
       const cwaTownPageUrl = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
+      const cwaQpfUrl = "https://www.cwa.gov.tw/V8/C/P/QPF.html?active=1";
+      const cwaQpf6hrImages = ["06", "12", "18", "24", "30", "36", "42", "48"].map((hour) => ({
+        hour,
+        url: `https://www.cwa.gov.tw/Data/fcst_img/QPF_ChFcstPrecip_6_${hour}.png`,
+      }));
       const officialServices = {
         JP: {
           label: "日本",
@@ -1367,6 +1418,26 @@
                   <p class="cwa-rain-meta">載入 CWA 降雨機率中。</p>
                 </div>
                 <a href="${cwaTownUrl}" target="_blank" rel="noreferrer">開啟 CWA 預報</a>
+              </article>
+              <article class="official-card link-only qpf-card">
+                <div>
+                  <span>中央氣象署</span>
+                  <h3>CWA 定量降水預報</h3>
+                  <p>6 小時定量降水預報，依序顯示未來 6 至 48 小時的預估累積雨量。</p>
+                  <div class="qpf-preview-grid">
+                    ${cwaQpf6hrImages
+                      .map(
+                        (image) => `
+                          <figure class="qpf-preview">
+                            <figcaption>未來 ${Number(image.hour)} 小時</figcaption>
+                            <img src="${image.url}" alt="CWA 未來 ${Number(image.hour)} 小時定量降水預報圖" loading="lazy">
+                          </figure>
+                        `,
+                      )
+                      .join("")}
+                  </div>
+                </div>
+                <a href="${cwaQpfUrl}" target="_blank" rel="noreferrer">開啟 6 小時預報</a>
               </article>
             </div>
           `;
