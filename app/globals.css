@@ -392,7 +392,7 @@ h1 {
 }
 
 .official-grid.taiwan {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
 }
 
 .official-card {
@@ -491,6 +491,40 @@ h1 {
 .official-card.link-only {
   min-height: 180px;
   grid-template-rows: 1fr auto;
+}
+
+.official-card.qpf-card {
+  min-height: 280px;
+  border-color: rgba(14, 165, 233, 0.32);
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.96), rgba(255, 255, 255, 0.92));
+}
+
+.qpf-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.qpf-preview {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.qpf-preview figcaption {
+  padding: 7px 8px;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.qpf-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .chart-section {
@@ -656,6 +690,14 @@ h1 {
   .official-grid {
     grid-template-columns: 1fr;
   }
+
+  .official-grid.taiwan {
+    grid-template-columns: 1fr;
+  }
+
+  .qpf-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
@@ -758,6 +800,10 @@ h1 {
 
   .official-card.link-only {
     min-height: 142px;
+  }
+
+  .qpf-preview-grid {
+    grid-template-columns: 1fr;
   }
 
   .model-registry {

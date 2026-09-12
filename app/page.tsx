@@ -120,6 +120,11 @@ const TAIWAN_TOWNS_URL = "/taiwan_towns.json";
 const CWA_RAIN_PROBABILITY_URL = "/cwa_rain_probability.json";
 const CWA_TOWN_INDEX_URL = "https://www.cwa.gov.tw/V8/C/W/Town/index.html";
 const CWA_TOWN_PAGE_URL = "https://www.cwa.gov.tw/V8/C/W/Town/Town.html";
+const CWA_QPF_URL = "https://www.cwa.gov.tw/V8/C/P/QPF.html?active=1";
+const CWA_QPF_6HR_IMAGE_URLS = ["06", "12", "18", "24", "30", "36", "42", "48"].map((hour) => ({
+  hour,
+  url: `https://www.cwa.gov.tw/Data/fcst_img/QPF_ChFcstPrecip_6_${hour}.png`,
+}));
 const OFFICIAL_SERVICES: Record<string, OfficialService> = {
   JP: {
     label: "日本",
@@ -1179,6 +1184,26 @@ export default function Home() {
               </div>
               <a href={cwaTownUrl} target="_blank" rel="noreferrer">
                 開啟 CWA 預報
+              </a>
+            </article>
+            <article className="official-card link-only qpf-card">
+              <div>
+                <span>中央氣象署</span>
+                <h3>CWA 定量降水預報</h3>
+                <p>6 小時定量降水預報，依序顯示未來 6 至 48 小時的預估累積雨量。</p>
+                <div className="qpf-preview-grid">
+                  {CWA_QPF_6HR_IMAGE_URLS.map((image) => (
+                    <figure className="qpf-preview" key={image.hour}>
+                      <figcaption>未來 {Number(image.hour)} 小時</figcaption>
+                      {/* CWA publishes these forecasts as live external images. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.url} alt={`CWA 未來 ${Number(image.hour)} 小時定量降水預報圖`} loading="lazy" />
+                    </figure>
+                  ))}
+                </div>
+              </div>
+              <a href={CWA_QPF_URL} target="_blank" rel="noreferrer">
+                開啟 6 小時預報
               </a>
             </article>
           </div>
