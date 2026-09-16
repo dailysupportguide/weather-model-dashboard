@@ -125,6 +125,7 @@ const CWA_QPF_6HR_IMAGE_URLS = ["06", "12", "18", "24", "30", "36", "42", "48"].
   hour,
   url: `https://www.cwa.gov.tw/Data/fcst_img/QPF_ChFcstPrecip_6_${hour}.png`,
 }));
+const freshDataVersion = () => Date.now().toString();
 const OFFICIAL_SERVICES: Record<string, OfficialService> = {
   JP: {
     label: "日本",
@@ -1035,7 +1036,7 @@ export default function Home() {
     async function loadCwaRain() {
       setCwaRainLoading(true);
       try {
-        const response = await fetch(`${CWA_RAIN_PROBABILITY_URL}?ts=20260910`, {
+        const response = await fetch(`${CWA_RAIN_PROBABILITY_URL}?ts=${freshDataVersion()}`, {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error(`CWA rain data failed: ${response.status}`);

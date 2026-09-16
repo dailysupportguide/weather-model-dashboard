@@ -1372,7 +1372,7 @@
         const townTid = getCwaTownTid(place);
         if (!townTid) return null;
         if (!cwaRainCache) {
-          cwaRainCache = await fetchJson("cwa_rain_probability.json?ts=20260910");
+          cwaRainCache = await fetchJson(`cwa_rain_probability.json?ts=${Date.now()}`);
         }
         return cwaRainCache.towns?.[townTid] || null;
       }
