@@ -110,8 +110,8 @@ declare global {
   }
 }
 
-const DEFAULT_LATITUDE = 25.03;
-const DEFAULT_LONGITUDE = 121.56;
+const DEFAULT_LATITUDE = 25.008508;
+const DEFAULT_LONGITUDE = 121.512268;
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
@@ -780,7 +780,7 @@ export default function Home() {
   const precipitationCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const temperatureChartRef = useRef<{ destroy: () => void } | null>(null);
   const precipitationChartRef = useRef<{ destroy: () => void } | null>(null);
-  const [locationQuery, setLocationQuery] = useState("台北市");
+  const [locationQuery, setLocationQuery] = useState("樂華夜市");
   const [places, setPlaces] = useState<Place[]>([]);
   const [geocodeState, setGeocodeState] = useState<GeocodeState>("idle");
   const [chartReady, setChartReady] = useState(false);
@@ -793,9 +793,10 @@ export default function Home() {
   const [cwaRainGeneratedAt, setCwaRainGeneratedAt] = useState("");
   const [cwaRainLoading, setCwaRainLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place>({
-    id: "default-taipei",
-    name: "台北市",
-    county: "台北市",
+    id: "65000040",
+    name: "樂華夜市",
+    county: "新北市",
+    admin2: "永和區",
     country: "台灣",
     country_code: "TW",
     source: "taiwan-town",

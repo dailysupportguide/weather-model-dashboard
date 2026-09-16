@@ -912,7 +912,7 @@
             <span>地點查座標</span>
             <input
               id="locationInput"
-              value="台北市"
+              value="樂華夜市"
               placeholder="輸入地點、Google 座標文字或 Google Maps 網址"
               aria-label="Coordinate lookup"
             />
@@ -945,7 +945,7 @@
         <div class="section-title-row">
           <div>
             <p class="eyebrow">Official Forecast</p>
-            <h2 id="officialTitle">台北市 官方氣象預報</h2>
+            <h2 id="officialTitle">樂華夜市 · 新北市 · 台灣 官方氣象預報</h2>
           </div>
         </div>
         <div id="officialForecast"></div>
@@ -1074,14 +1074,15 @@
         temperatureChart: null,
         precipitationChart: null,
         selectedPlace: {
-          id: "default-taipei",
-          name: "台北市",
-          county: "台北市",
+          id: "65000040",
+          name: "樂華夜市",
+          county: "新北市",
+          admin2: "永和區",
           country: "台灣",
           country_code: "TW",
           source: "taiwan-town",
-          latitude: 25.03,
-          longitude: 121.56,
+          latitude: 25.008508,
+          longitude: 121.512268,
         },
       };
       let cwaRainCache = null;
