@@ -16,6 +16,16 @@ export const metadata: Metadata = {
   title: "全球三核心氣象模型預測對比儀表板",
   description:
     "Compare aligned hourly 2m temperature forecasts from ECMWF IFS, ECMWF AIFS, and Google DeepMind WeatherNext.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/app-icon-192.png",
+    apple: "/app-icon-512.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "三模天氣",
+  },
 };
 
 export default function RootLayout({
