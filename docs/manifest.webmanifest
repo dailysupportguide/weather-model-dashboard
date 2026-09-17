@@ -1,6 +1,6 @@
 {
   "name": "全球三核心氣象模型預測對比儀表板",
-  "short_name": "三模天氣",
+  "short_name": "大師說氣象",
   "description": "比較歐洲傳統、歐洲 AI 與 WNC 的逐時天氣預報。",
   "start_url": "./",
   "scope": "./",
