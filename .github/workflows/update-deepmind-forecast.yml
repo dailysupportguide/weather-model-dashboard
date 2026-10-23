@@ -2,7 +2,7 @@ name: Update DeepMind forecast
 
 on:
   schedule:
-    - cron: "15 0 * * *"
+    - cron: "30 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,13 +17,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Generate forecast JSON
         run: python scripts/generate_deepmind_forecast.py --latitude 25.03 --longitude 121.56 --hours 48
       - name: Commit updated forecast
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: Update DeepMind forecast JSON
-          file_pattern: public/deepmind_forecast.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/deepmind_forecast.json
+          if git diff --cached --quiet; then
+            echo "No DeepMind forecast changes to commit"
+            exit 0
+          fi
+          git commit -m "Update DeepMind forecast JSON"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 5))
+          done
+          exit 1

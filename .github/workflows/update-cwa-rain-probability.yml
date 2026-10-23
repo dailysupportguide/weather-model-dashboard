@@ -22,6 +22,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -30,10 +32,23 @@ jobs:
           python scripts/generate_cwa_rain_probability.py --output docs/cwa_rain_probability.json
           cp docs/cwa_rain_probability.json public/cwa_rain_probability.json
       - name: Commit updated CWA rain probability
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: Update CWA rain probability JSON
-          file_pattern: docs/cwa_rain_probability.json public/cwa_rain_probability.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/cwa_rain_probability.json public/cwa_rain_probability.json
+          if git diff --cached --quiet; then
+            echo "No CWA rain probability changes to commit"
+            exit 0
+          fi
+          git commit -m "Update CWA rain probability JSON"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 5))
+          done
+          exit 1
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
